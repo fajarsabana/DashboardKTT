@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+
+<html lang="id">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>KTT Dashboard — Index (single-file)</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css" rel="stylesheet"/>
+<link href="https://cdn.datatables.net/v/bs5/dt-2.1.8/datatables.min.css" rel="stylesheet"/>
+<style>
+  body{background:#f3f3f4}
+  .sidebar{width:250px;background:#2f4050;color:#cfd8dc;position:fixed;height:100%;left:0;top:0}
+  .sidebar .brand{padding:18px 20px;font-weight:700;color:#fff;background:#293846}
+  .sidebar a{display:block;color:#cfd8dc;padding:10px 20px;text-decoration:none}
+  .sidebar a.active,.sidebar a:hover{background:#243342;color:#fff}
+  .content{margin-left:250px;padding:20px}
+  .ibox{background:#fff;border:1px solid #e7eaec;border-radius:8px;margin-bottom:16px;position:relative}
+  .ibox-title{padding:12px 16px;border-bottom:1px solid #e7eaec;font-weight:600;display:flex;align-items:center;gap:.5rem;position:relative}
+  .ibox-content{padding:16px}
+  .kpi .val{font-size:1.8rem;font-weight:700}
+  .up{color:#1ab394}.down{color:#e74c3c}
+  .pill{font-size:.75rem;padding:.25rem .5rem;background:#eef2f6;border-radius:999px}
+  canvas { background: #fff; border-radius:6px; }
+  /* popover mini sparkline */
+  .spark-popover{
+    position:absolute;
+    z-index:9999;
+    background:#ffffff;
+    border:1px solid #e0e0e0;
+    border-radius:6px;
+    padding:4px 6px;
+    box-shadow:0 2px 8px rgba(0,0,0,.15);
+    display:none;
+  }
+
+  /* --- equal-height rows (KPI cards) --- */
+  .equal-height > [class^="col"], .equal-height > [class*=" col"]{ display:flex; }
+  .equal-height .ibox{ width:100%; }
+  .ibox-title .unit-select{ width:90px; max-width:120px; }
+
+</style>
+</head>
+<body>
+<aside class="sidebar">
+<div class="brand"><i class="fa-solid fa-bolt me-2"></i>KTT Dashboard</div>
+<a class="active" href="index.html"><i class="fa-solid fa-gauge me-2"></i>Dashboard</a>
+<a href="industri.html"><i class="fa-solid fa-industry me-2"></i>Industri</a>
+<a href="pelanggan.html"><i class="fa-solid fa-users me-2"></i>Pelanggan</a>
+</aside>
+<main class="content">
+<div class="d-flex justify-content-between align-items-center mb-3">
+<h4 class="fw-semibold mb-0">Dashboard — Ikhtisar</h4>
+<div class="d-flex gap-2">
+<input accept=".xlsx,.xls" class="form-control form-control-sm" id="fileInput" style="width:320px" type="file"/>
+<button class="btn btn-outline-secondary btn-sm" id="btnReset"><i class="fa-solid fa-rotate"></i> Reset</button>
+</div>
+</div>
+<div class="ibox">
+<div class="ibox-title">Filter</div>
+<div class="ibox-content">
+<div class="row g-3">
+<div class="col-md-3">
+<label class="form-label">UID</label>
+<select class="form-select" id="filterUID"><option value="ALL">Semua</option></select>
+</div>
+<div class="col-md-3">
+<label class="form-label">Tahun</label>
+<select class="form-select" id="filterYear"></select>
+</div>
+<div class="col-md-3">
+<label class="form-label">Industri (JENIS)</label>
+<select class="form-select" id="filterIndustri"><option value="ALL">Semua</option></select>
+</div>
+<div class="col-md-3 d-flex align-items-end">
+<span class="pill ms-auto" id="periodInfo">—</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Extra KPIs -->
+<div class="row g-3 mb-3 equal-height" id="extraKPIs">
+<div class="col-md-3">
+<div class="ibox">
+<div class="ibox-title d-flex justify-content-between align-items-center"><span><i class="fa-solid fa-plug me-2"></i>Daya Terpasang</span><select id="unitDaya" class="form-select form-select-sm unit-select ms-auto"><option value="kVA">kVA</option><option value="MVA" selected>MVA</option><option value="GVA">GVA</option></select></div>
+<div class="ibox-content kpi"><span class="val" id="kpiDaya">-</span></div>
+</div>
+</div>
+<div class="col-md-3">
+<div class="ibox">
+<div class="ibox-title"><i class="fa-solid fa-users me-2"></i>Jumlah Pelanggan</div>
+<div class="ibox-content kpi"><span class="val" id="kpiJumlahPelanggan">-</span></div>
+</div>
+</div>
+<div class="col-md-6">
+<div class="ibox">
+<div class="ibox-title d-flex justify-content-between align-items-center" id="komposisiHeader" style="cursor:pointer">
+<span><i class="fa-solid fa-list me-2"></i>Komposisi Tarif</span>
+<span class="small text-muted" id="komposisiSummary">Klik untuk detail</span>
+</div>
+<div class="ibox-content p-0">
+<div class="d-none" id="komposisiBody">
+<div class="p-2" id="komposisiTarif" style="font-size:.9rem"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="row g-3 mb-3 equal-height">
+<div class="col-md-4">
+<div class="ibox">
+<div class="ibox-title">
+<i class="fa-solid fa-bolt me-2 text-warning"></i>
+<span id="titleEnergi">Total Energi — Cumulative</span><select id="unitEnergi" class="form-select form-select-sm unit-select ms-auto"><option value="kWh">kWh</option><option value="MWh" selected>MWh</option><option value="GWh">GWh</option></select>
+</div>
+<div class="ibox-content kpi">
+<div id="kpiEnergiLabel" style="font-size:.9rem">Energi s.d. —</div>
+<div class="val" id="kpiEnergi">-</div>
+</div>
+</div>
+</div>
+<div class="col-md-4">
+<div class="ibox">
+<div class="ibox-title">
+<i class="fa-solid fa-arrow-trend-up me-1"></i>
+<span id="titleMoM">Growth MoM</span>
+<span class="ms-1 text-muted small" id="labelMoM"></span>
+</div>
+<div class="ibox-content kpi">
+<span class="val" id="kpiMoM">0%</span>
+</div>
+</div>
+</div>
+<div class="col-md-4">
+<div class="ibox">
+<div class="ibox-title">
+<i class="fa-solid fa-chart-line me-2"></i>
+<span id="titleYoY">Growth YoY (Cumulative)</span>
+<span class="ms-1 text-muted small" id="labelYoY"></span>
+</div>
+<div class="ibox-content kpi">
+<span class="val" id="kpiYoY">-</span>
+</div>
+</div>
+</div>
+</div>
+<div class="row g-3">
+<div class="col-lg-8">
+<div class="ibox">
+<div class="ibox-title d-flex justify-content-between align-items-center"><span><i class="fa-solid fa-chart-line me-2"></i>Tren Energi (GWh) — Cumulative</span><div class="d-flex align-items-center gap-2"><span class="text-muted small">Tampilkan tahun:</span><div class="d-flex flex-wrap gap-2" id="yearTogglesMonthly" data-year-toggles="1"></div></div></div>
+<div class="ibox-content"><canvas height="280" id="lineTrend"></canvas></div>
+</div>
+</div>
+
+<div class="ibox">
+  <div class="ibox-title d-flex justify-content-between align-items-center"><span><i class="fa-solid fa-chart-line me-2"></i>Tren Energi (GWh) — Kumulatif (YTD)</span><div class="d-flex align-items-center gap-2"><span class="text-muted small">Tampilkan tahun:</span><div class="d-flex flex-wrap gap-2" id="yearTogglesYTD" data-year-toggles="1"></div></div></div>
+  <div class="ibox-content"><canvas id="lineTrendYTD" height="280"></canvas></div>
+</div>
+<div class="col-lg-4">
+<div class="ibox">
+<div class="ibox-title"><i class="fa-solid fa-chart-pie me-2"></i>Komposisi Industri (Cumulative)</div>
+<div class="ibox-content"><canvas height="240" id="pieIndustri"></canvas></div>
+</div>
+</div>
+</div>
+<div class="ibox">
+<div class="ibox-title d-flex justify-content-between align-items-center">
+<span>Top Pelanggan — Cumulative</span>
+<button class="btn btn-outline-success btn-sm" id="btnExport"><i class="fa-solid fa-file-excel"></i> Export</button>
+</div>
+<div class="ibox-content">
+<table class="table table-striped" id="tblAll" style="width:100%">
+<thead><tr><th>#</th><th>Nama</th><th>Daya (kVA)</th><th>Industri</th><th>Pemakaian Bulan (MWh)</th><th>Total MWh</th></tr></thead><tbody></tbody>
+</table>
+</div>
+</div>
+<div class="text-center text-muted py-3">© 2025 KTT Dashboard — Index</div>
+<!-- satu popover untuk semua sparkline -->
+<div class="spark-popover" id="sparkPopover">
+<canvas height="60" id="sparkCanvas" width="180"></canvas>
+</div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/v/bs5/dt-2.1.8/datatables.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+// register plugin datalabels kalau ada
+if (window.Chart && window.ChartDataLabels) {
+  Chart.register(window.ChartDataLabels);
+}
+
+// ----------------------- CORE UTIL (digabung) -----------------------
+const KTT = (function(){
+  const nf = new Intl.NumberFormat('id-ID');
+  const MONTHS = {
+    1:'JAN',2:'FEB',3:'MAR',4:'APR',5:'MEI',6:'JUN',7:'JUL',
+    8:'AGS',9:'SEP',10:'OKT',11:'NOV',12:'DES'
+  };
+  const MONTH_LABEL = (m)=>String(m).padStart(2,'0');
+
+  function isBadName(n){
+    const s=String(n||'').trim();
+    if(!s) return true;
+    return /^[0-9.,]+$/.test(s);
+  }
+  function prettyName(n,id){
+    const s=String(n||'').trim();
+    if(!isBadName(s)) return s;
+    const i=String(id||'').replace(/\.0+$/,'').trim();
+    return i?('IDPEL '+i):'(Tanpa Nama)';
+  }
+
+  async function parseExcelFile(file){
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf,{type:'array'});
+    const sheetName = wb.SheetNames.includes("DATA PEMAKAIAN PER BULAN")
+      ? "DATA PEMAKAIAN PER BULAN"
+      : wb.SheetNames[0];
+    const ws = wb.Sheets[sheetName];
+    const A = XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+    const H0=A[0]||[], H1=A[1]||[];
+
+    const ID_MONTHS = {
+      'JAN':1,'JANUARI':1,
+      'FEB':2,'FEBRUARI':2,
+      'MAR':3,'MARET':3,
+      'APR':4,'APRIL':4,
+      'MEI':5,'MAY':5,
+      'JUN':6,'JUNI':6,
+      'JUL':7,'JULI':7,
+      'AGU':8,'AGS':8,'AGT':8,'AGST':8,'AGUSTUS':8,
+      'SEP':9,'SEPT':9,'SEPTEMBER':9,
+      'OKT':10,'OCT':10,'OKTOBER':10,
+      'NOV':11,'NOVEMBER':11,
+      'DES':12,'DEC':12,'DESEMBER':12
+    };
+
+    function extractMonthFromCell(h0,h1){
+      const txt = ((h0||'')+' '+(h1||'')).toUpperCase();
+      for(const k in ID_MONTHS){
+        if(txt.includes(k)) return ID_MONTHS[k];
+      }
+      const m = txt.match(/(0?[1-9]|1[0-2])/);
+      return m?Number(m[0]):null;
+    }
+
+    // detect year from header (handle "2,025")
+    const yearAt = [];
+    let lastYear = null;
+    for(let c=8;c<Math.max(H0.length,H1.length);c++){
+      const combined = String(H0[c]||'') + ' ' + String(H1[c]||'');
+      const cleaned = combined.replace(/[^\d]/g,'');
+      const m = cleaned.match(/(19|20)\d{2}/);
+      const y = m ? m[0] : null;
+      if(y) lastYear = Number(y);
+      yearAt[c]=lastYear;
+    }
+
+    const monthCols = [];
+    for(let c=8;c<Math.max(H0.length,H1.length);c++){
+      const mon = extractMonthFromCell(H0[c],H1[c]);
+      const y = yearAt[c];
+      if(mon && y) monthCols.push({c, year:y, month:mon});
+    }
+    if(!monthCols.length) throw new Error("Gagal deteksi kolom periode. Cek header sheet.");
+
+    const IDX = {UID:1, PROV:2, IDPEL:3, NAMA:4, JENIS:5, GOLT:6, DAYA:7};
+    const DATA=[];
+    const LABELS = new Map();
+    for(let r=2;r<A.length;r++){
+      const row=A[r]; if(!row) continue;
+      const UID=row[IDX.UID], PROV=row[IDX.PROV], IDPEL=row[IDX.IDPEL],
+            NAMA=row[IDX.NAMA], JENIS=row[IDX.JENIS], GOLT=row[IDX.GOLT], DAYA=row[IDX.DAYA];
+      const upN = String(NAMA||'').toUpperCase(), upU=String(UID||'').toUpperCase();
+      if((!IDPEL && !NAMA) || upN.includes('TOTAL')||upN.includes('JUMLAH')||upU.includes('TOTAL')) continue;
+      for(const mc of monthCols){
+        const raw = row[mc.c];
+        if(raw===null||raw===undefined||raw==='') continue;
+        const kwh = toNumber(raw);
+        DATA.push({
+          UID, PROV,
+          IDPEL:String(IDPEL||'').trim(),
+          NAMA, JENIS, GOLT, DAYA,
+          TAHUN:mc.year, BULAN:mc.month, KWH:kwh
+        });
+        if(IDPEL){
+          const cur = LABELS.get(String(IDPEL)) || null;
+          const cand = prettyName(NAMA,IDPEL);
+          if(!cur) LABELS.set(String(IDPEL), cand);
+          else if(isBadName(cur) && !isBadName(cand)) LABELS.set(String(IDPEL), cand);
+        }
+      }
+    }
+    return {DATA, LABELS};
+  }
+
+  function toNumber(v){
+    if(v==null) return 0;
+    if(typeof v==='number' && isFinite(v)) return v;
+    const s=String(v)
+      .replace(/\s+/g,'')
+      .replace(/\./g,'')
+      .replace(/,/g,'.')
+      .replace(/[^0-9.+-eE]/g,'');
+    const n=parseFloat(s);
+    return isNaN(n)?0:n;
+  }
+
+  function shortNumber(v){
+    const n = Number(v) || 0;
+    const abs = Math.abs(n);
+    let out;
+    if (abs >= 1e9)      out = (n/1e9).toFixed(1) + 'B';
+    else if (abs >= 1e6) out = (n/1e6).toFixed(1) + 'M';
+    else if (abs >= 1e3) out = (n/1e3).toFixed(1) + 'K';
+    else                 out = Math.round(n).toString();
+    return out.replace('.0','');
+  }
+function formatEnergy(kwh){
+  const n = Number(kwh) || 0;
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return { value: n/1e9, unit: 'TWh', decimals: 3 };   // 1 TWh = 1e9 kWh
+  if (abs >= 1e3) return { value: n/1e3, unit: 'MWh', decimals: 0 };   // 1 MWh = 1e3 kWh
+  return { value: n, unit: 'kWh', decimals: 0 };
+}
+
+function formatEnergyStr(kwh){
+  const e = formatEnergy(kwh);
+  const val = (e.decimals === 0) ? Math.round(e.value) : Number(e.value.toFixed(e.decimals));
+  return `${nf.format(val)} ${e.unit}`;
+}
+
+
+  function buildMonthMap(rows){
+    const m = new Map();
+    rows.forEach(r=>{
+      const k = `${r.TAHUN}-${MONTH_LABEL(r.BULAN)}`;
+      m.set(k,(m.get(k)||0)+(r.KWH||0));
+    });
+    return m;
+  }
+
+  function ytdSum(monthMap, year, m){
+    let s=0;
+    for(let i=1;i<=m;i++){
+      s+= (monthMap.get(`${year}-${MONTH_LABEL(i)}`)||0);
+    }
+    return s;
+  }
+
+  function lastActiveMonth(rows){
+    const sums = buildMonthMap(rows);
+    const monthsByYear = {};
+    rows.forEach(r=>{
+      monthsByYear[r.TAHUN] = monthsByYear[r.TAHUN] || new Set();
+      monthsByYear[r.TAHUN].add(r.BULAN);
+    });
+    const years = Object.keys(monthsByYear).map(Number).sort((a,b)=>a-b);
+    if(!years.length) return { last:0, sums };
+    const lastYear = years[years.length-1];
+    const last = Math.max(...Array.from(monthsByYear[lastYear]));
+    return { last, sums };
+  }
+
+  function drawLine(canvasId, year, monthSumsMap, lastM, selectedMonth, onPointClick, extraYears=[]){
+  const labels = [...Array(12)].map((_,i)=>MONTH_LABEL(i+1));
+
+  function lastMonthFromMap(yy){
+    for(let m=12;m>=1;m--){
+      const k = `${yy}-${MONTH_LABEL(m)}`;
+      const v = monthSumsMap.get(k);
+      if(v!=null && v!==0) return m;
+    }
+    return 0;
+  }
+
+  const years = [year, ...(extraYears||[]).filter(y=>y && y!==year)];
+  const datasets = years.map((yy, idx)=>{
+    const lm = (yy===year && lastM) ? lastM : lastMonthFromMap(yy);
+    const dataGwh = labels.map((_,i)=>{
+      const mm = i+1;
+      const k = `${yy}-${MONTH_LABEL(mm)}`;
+      const v = monthSumsMap.get(k) || 0;
+      return (mm<=lm) ? (v/1e6) : null; // kWh -> GWh
+    });
+    return {
+      label: `${yy} (GWh)`,
+      data: dataGwh,
+      tension: .3,
+      fill: false,
+      borderWidth: (yy===year ? 2 : 1),
+      borderDash: (yy===year ? [] : [6,4]),
+      pointRadius: (yy===year ? 3 : 2),
+      pointHoverRadius: 4
+    };
+  });
+
+  // adaptive y range (tidak mulai dari 0)
+  const allVals = [];
+  datasets.forEach(ds=>{
+    (ds.data||[]).forEach(v=>{
+      if(v!=null && isFinite(v)) allVals.push(v);
+    });
+  });
+  let suggestedMin = 0, suggestedMax = 0;
+  if(allVals.length){
+    const yMin = Math.min(...allVals);
+    const yMax = Math.max(...allVals);
+    const range = (yMax - yMin);
+    const pad = range > 0 ? range*0.08 : (yMax||1)*0.08;
+    suggestedMin = Math.max(0, yMin - pad);
+    suggestedMax = yMax + pad;
+  }
+
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  const chart = new Chart(ctx, {
+    type:'line',
+    data:{ labels, datasets },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      scales:{
+        y:{
+          beginAtZero:false,
+          suggestedMin,
+          suggestedMax,
+          ticks:{ callback: v => `${Number(v).toFixed(2)} GWh` }
+        }
+      },
+      plugins:{
+        tooltip:{
+          mode:'index',
+          intersect:false,
+          callbacks:{
+            label: ctx => {
+              const val = ctx.parsed.y;
+              if(val==null) return '';
+              return `${ctx.dataset.label}: ${val.toFixed(2)} GWh`;
+            }
+          }
+        },
+        datalabels:{
+          // label hanya untuk tahun utama (dataset 0) biar tidak rame
+          display: (context)=> context.datasetIndex === 0,
+          align:'top',
+          anchor:'end',
+          clamp:true,
+          formatter: v => (v ? v.toFixed(2) : ''),
+          font:{ size:10 }
+        }
+      }
+    }
+  });
+
+  document.getElementById(canvasId).onclick = function(evt){
+    const pts = chart.getElementsAtEventForMode(evt,'nearest',{intersect:true},true);
+    if(!pts.length) return;
+    const idx = pts[0].index;
+    const clicked = idx+1;
+
+    // batasi klik hanya jika tahun utama punya data sampai bulan tsb
+    if(lastM && clicked>lastM) return;
+
+    if(typeof onPointClick === 'function') onPointClick(clicked);
+  };
+  return chart;
+}
+
+  function drawPie(canvasId, labels, data, onClickIdx){
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    const total = data.reduce((a,b)=>a+b,0) || 1;
+
+    const chart = new Chart(ctx,{
+      type:'pie',
+      data:{ labels, datasets:[{ data }] },
+      options:{
+        responsive:true,
+        plugins:{
+          tooltip:{
+            callbacks:{
+              label: ctx => {
+                const v   = ctx.parsed;
+                const pct = v/total*100;
+                return `${ctx.label}: ${shortNumber(v)} (${pct.toFixed(1)}%)`;
+              }
+            }
+          },
+          datalabels:{
+            formatter: v => {
+              const pct = v/total*100;
+              return pct >= 3 ? pct.toFixed(1)+'%' : '';
+            },
+            color:'#fff',
+            font:{ size:9 }
+          }
+        }
+      }
+    });
+
+    if(typeof onClickIdx === 'function'){
+      document.getElementById(canvasId).onclick = function(evt){
+        const el = chart.getElementsAtEventForMode(evt,'nearest',{intersect:true},true);
+        if(!el.length) return;
+        onClickIdx(el[0].index);
+      };
+    }
+    return chart;
+  }
+
+  function setDataTable(selector, options={}, rows=[], onReady){
+    if($.fn.dataTable.isDataTable(selector)) $(selector).DataTable().destroy();
+    $(selector+' tbody').empty();
+    const table = $(selector).DataTable(Object.assign({
+      data: rows,
+      columns: Array.from({length: (rows[0]||[]).length}, (_,i)=>({title: '', defaultContent:''})),
+      paging: true
+    }, options));
+    if(typeof onReady==='function') onReady(table);
+    return table;
+  }
+
+  function saveSession(DATA, LABELS, meta={}){
+    try{
+      localStorage.setItem('KTT_DATA', JSON.stringify(DATA));
+      const o = {};
+      LABELS.forEach((v,k)=> o[k]=v);
+      localStorage.setItem('KTT_LABELS', JSON.stringify(o));
+      localStorage.setItem('KTT_META', JSON.stringify(meta));
+      return true;
+    }catch(e){ return false; }
+  }
+  function loadSession(){
+    try{
+      const D = JSON.parse(localStorage.getItem('KTT_DATA')||'[]');
+      const L = JSON.parse(localStorage.getItem('KTT_LABELS')||'{}');
+      const map = new Map(Object.entries(L));
+      return { ok:true, DATA:D, LABELS:map };
+    }catch(e){ return { ok:false }; }
+  }
+  function clearSession(){
+    localStorage.removeItem('KTT_DATA');
+    localStorage.removeItem('KTT_LABELS');
+    localStorage.removeItem('KTT_META');
+  }
+
+  function getQuery(){
+    const qs = (location.search||'').replace(/^\?/,'');
+    const o={};
+    qs.split('&').forEach(p=>{
+      if(!p) return;
+      const kv = p.split('=');
+      o[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1]||'');
+    });
+    return o;
+  }
+
+  function goIndustri(ind, uid, year){
+    const url = `industri.html?ind=${encodeURIComponent(ind||'')}&uid=${encodeURIComponent(uid||'')}&year=${encodeURIComponent(year||'')}`;
+    location.href = url;
+  }
+  function goPelanggan(idpel, uid, year){
+    const url = `pelanggan.html?pel=${encodeURIComponent(idpel||'')}&uid=${encodeURIComponent(uid||'')}&year=${encodeURIComponent(year||'')}`;
+    location.href = url;
+  }
+
+  return {
+    nf, MONTHS, MONTH_LABEL, prettyName, isBadName,
+    parseExcelFile, toNumber, buildMonthMap, ytdSum, lastActiveMonth,
+    drawLine, drawPie, setDataTable,
+    saveSession, loadSession, clearSession, getQuery,
+    goIndustri, goPelanggan,
+    shortNumber,
+    formatEnergy,
+    formatEnergyStr,
+};
+})();
+// ----------------------- END CORE -----------------------
+
+
+/* ------------------------- PAGE LOGIC ------------------------- */
+let DATA=[], LABELS=new Map(), lineChart=null, lineChartYTD=null, pieChart=null, SELECTED_MONTH=null;
+let SHOW_YEARS = new Set(JSON.parse(localStorage.getItem('KTT_SHOW_YEARS') || '[]'));
+
+let SPARK = { labels:[], ener:[], mom:[], yoy:[] };
+let sparkChart = null;
+
+function renderYearToggles(years, selectedYear){
+  const wraps = Array.from(document.querySelectorAll('[data-year-toggles="1"]'));
+  if(!wraps.length) return;
+
+  const others = (years||[])
+    .filter(y => y && Number(y) !== Number(selectedYear))
+    .map(Number)
+    .sort((a,b)=>b-a);
+
+  // bersihkan tahun yg tidak relevan
+  SHOW_YEARS.forEach(y=>{ if(!others.includes(Number(y))) SHOW_YEARS.delete(y); });
+
+  wraps.forEach(w => w.innerHTML = '');
+
+  if(!others.length){
+    wraps.forEach(w => w.innerHTML = '<span class="text-muted small">—</span>');
+    localStorage.setItem('KTT_SHOW_YEARS', JSON.stringify(Array.from(SHOW_YEARS)));
+    return;
+  }
+
+  others.forEach(y=>{
+    wraps.forEach((wrap, wi)=>{
+      const id = `yt_${y}_${wi}`;
+      const div = document.createElement('div');
+      div.className = 'form-check form-check-inline m-0';
+      div.innerHTML = `
+        <input class="form-check-input" type="checkbox" id="${id}" ${SHOW_YEARS.has(y)?'checked':''}>
+        <label class="form-check-label small" for="${id}">${y}</label>
+      `;
+      div.querySelector('input').addEventListener('change', (e)=>{
+        if(e.target.checked) SHOW_YEARS.add(y);
+        else SHOW_YEARS.delete(y);
+        localStorage.setItem('KTT_SHOW_YEARS', JSON.stringify(Array.from(SHOW_YEARS)));
+        applyFilters(); // re-render => kedua checkbox ikut sinkron
+      });
+      wrap.appendChild(div);
+    });
+  });
+
+  localStorage.setItem('KTT_SHOW_YEARS', JSON.stringify(Array.from(SHOW_YEARS)));
+}
+
+
+
+function buildFilters(){
+  const uids=[...new Set(DATA.map(r=>r.UID).filter(x=>String(x||'').trim()!==''))].sort();
+  $('#filterUID').html('<option value="ALL">Semua</option>'+uids.map(x=>`<option>${x}</option>`));
+  const years=[...new Set(DATA.map(r=>r.TAHUN))].sort((a,b)=>a-b);
+  $('#filterYear').html(years.map(y=>`<option value="${y}">${y}</option>`));
+  const inds=[...new Set(DATA.map(r=>r.JENIS||'(Tidak Diisi)'))].sort();
+  $('#filterIndustri').html('<option value="ALL">Semua</option>'+inds.map(x=>`<option>${x}</option>`));
+}
+
+function applyFilters(){
+  if(!DATA.length) return;
+
+  const fUID = $('#filterUID').val();
+  const ySel = +$('#filterYear').val();
+  const fInd = $('#filterIndustri').val();
+
+  const dimAll = DATA.filter(r =>
+    (fUID === 'ALL' || String(r.UID) === fUID) &&
+    (fInd === 'ALL' || String(r.JENIS || '(Tidak Diisi)') === fInd)
+  );
+  const dimYr  = dimAll.filter(r => r.TAHUN === ySel);
+
+  const { last: lastM } = KTT.lastActiveMonth(dimYr);
+  const mm = KTT.buildMonthMap(dimAll);
+
+  let activeM = SELECTED_MONTH || lastM;
+  if (!activeM || activeM > lastM) activeM = lastM || 0;
+
+  const activeMonthLabel = activeM ? KTT.MONTHS[activeM] : null;
+  $('#labelYoY').text(activeMonthLabel ? `(s.d. ${activeMonthLabel})` : '');
+
+  const YTD = activeM
+    ? dimYr.filter(r => r.BULAN >= 1 && r.BULAN <= activeM)
+    : [];
+
+  const tot_kWh = activeM ? KTT.ytdSum(mm, ySel, activeM) : 0;
+
+  // ---- unit energi (kWh / MWh / GWh) ----
+  const nf2 = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 });
+  const unitEnergi = ($('#unitEnergi').val() || localStorage.getItem('KTT_UNIT_ENERGI') || 'MWh');
+  localStorage.setItem('KTT_UNIT_ENERGI', unitEnergi);
+  let energiVal = 0;
+  if (unitEnergi === 'kWh') energiVal = tot_kWh;
+  else if (unitEnergi === 'MWh') energiVal = tot_kWh / 1e3;
+  else if (unitEnergi === 'GWh') energiVal = tot_kWh / 1e6;
+
+  $('#kpiEnergi').text(activeM ? `${nf2.format(energiVal)} ${unitEnergi}` : '-');
+  $('#kpiEnergiLabel').text(
+    activeM ? `Energi s.d. ${KTT.MONTHS[activeM]}` : 'Energi s.d. —'
+  );
+const dayaSet = new Map();
+  dimAll.forEach(r=>{
+    const d = KTT.toNumber(r.DAYA||0);
+    if(d>0) dayaSet.set(String(r.IDPEL||Math.random()), d);
+  });
+  const sumKVA = Array.from(dayaSet.values()).reduce((a,b)=>a+b,0);
+
+  // ---- unit daya (kVA / MVA / GVA) ----
+  const unitDaya = ($('#unitDaya').val() || localStorage.getItem('KTT_UNIT_DAYA') || 'MVA');
+  localStorage.setItem('KTT_UNIT_DAYA', unitDaya);
+
+  let dayaVal = 0;
+  if (unitDaya === 'kVA') dayaVal = sumKVA;
+  else if (unitDaya === 'MVA') dayaVal = sumKVA / 1e3;
+  else if (unitDaya === 'GVA') dayaVal = sumKVA / 1e6;
+
+  $('#kpiDaya').text(sumKVA ? `${new Intl.NumberFormat('id-ID',{maximumFractionDigits:2}).format(dayaVal)} ${unitDaya}` : '-');
+const idset = new Set(dimAll.map(r=>String(r.IDPEL)).filter(x=>x && x!=='null'));
+  $('#kpiJumlahPelanggan').text(KTT.nf.format(idset.size));
+  const totalCust = idset.size;
+
+  // Komposisi tarif: pelanggan unik per GOLT
+  const tarifMap = new Map();
+  dimAll.forEach(r=>{
+    const id = String(r.IDPEL || '').trim();
+    if (!id) return;
+    const tarif = r.GOLT || '(Tidak Diisi)';
+    if (!tarifMap.has(tarif)) tarifMap.set(tarif, new Set());
+    tarifMap.get(tarif).add(id);
+  });
+
+  const compArr = [...tarifMap.entries()]
+    .map(([tarif,set])=>{
+      const count = set.size;
+      const pct   = totalCust ? (count / totalCust * 100) : 0;
+      return {tarif,count,pct};
+    })
+    .sort((a,b)=>b.count-a.count)
+    .slice(0,10);
+
+  if (!compArr.length) {
+    $('#komposisiTarif').html('-');
+    $('#komposisiSummary').text('Tidak ada data tarif');
+  } else {
+    const rowsHtml = compArr.map((x,i)=>`
+      <tr>
+        <td>${i+1}</td>
+        <td>${x.tarif}</td>
+        <td class="text-end">${KTT.nf.format(x.count)}</td>
+        <td class="text-end">${x.pct.toFixed(1)}%</td>
+      </tr>`).join('');
+
+    $('#komposisiTarif').html(`
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Tarif</th>
+            <th class="text-end">Pelanggan</th>
+            <th class="text-end">%</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+    `);
+
+    const summary = compArr.slice(0,3)
+      .map(x=>`${x.tarif} ${x.pct.toFixed(1)}%`)
+      .join(' • ');
+    $('#komposisiSummary').text(summary || 'Klik untuk detail');
+  }
+
+  // Growth YoY (Cumulative)
+  let yoy = '–';
+  $('#kpiYoY').removeClass('up down');
+  if (activeM) {
+    const cur  = KTT.ytdSum(mm, ySel,   activeM);
+    const prev = KTT.ytdSum(mm, ySel-1, activeM);
+    if (prev > 0) {
+      const v = ((cur - prev) / prev) * 100;
+      yoy = (v>0?'+':'') + v.toFixed(2) + '%';
+      if (v > 0) $('#kpiYoY').addClass('up');
+      else if (v < 0) $('#kpiYoY').addClass('down');
+    }
+  }
+  $('#kpiYoY').text(yoy);
+
+  // Growth MoM
+  let mom = '0%';
+  $('#kpiMoM').removeClass('up down');
+  $('#labelMoM').text('');
+
+  if (activeM) {
+    const cur = mm.get(`${ySel}-${KTT.MONTH_LABEL(activeM)}`) || 0;
+    const py  = (activeM === 1) ? ySel - 1 : ySel;
+    const pm  = (activeM === 1) ? 12       : (activeM - 1);
+    const prv = mm.get(`${py}-${KTT.MONTH_LABEL(pm)}`) || 0;
+
+    const curLabel  = KTT.MONTHS[activeM];
+    const prevLabel = KTT.MONTHS[pm] + (py !== ySel ? ` ${py}` : '');
+    $('#labelMoM').text(`(${curLabel} vs ${prevLabel})`);
+
+    if (prv > 0) {
+      const v = ((cur - prv) / prv) * 100;
+      mom = (v>0?'+':'') + v.toFixed(2) + '%';
+      if (v > 0) $('#kpiMoM').addClass('up');
+      else if (v < 0) $('#kpiMoM').addClass('down');
+    }
+  }
+  $('#kpiMoM').text(mom);
+
+  // ---- hitung data untuk sparkline (YTD GWh, MoM%, YoY YTD%) ----
+  const labelsSpark = [];
+  const enerSpark   = [];
+  const momSpark    = [];
+  const yoySpark    = [];
+
+  let ytdCur = 0;
+  let ytdPrev = 0;
+  for(let m=1;m<=lastM;m++){
+    const keyCur  = `${ySel}-${KTT.MONTH_LABEL(m)}`;
+    const keyPrev = `${ySel-1}-${KTT.MONTH_LABEL(m)}`;
+
+    const kwhCur  = mm.get(keyCur)  || 0;
+    const kwhPrev = mm.get(keyPrev) || 0;
+
+    ytdCur  += kwhCur;
+    ytdPrev += kwhPrev;
+
+    labelsSpark.push(KTT.MONTHS[m]);
+    enerSpark.push(ytdCur/1e6); // GWh
+
+    // MoM
+    let momVal = null;
+    if(m===1){
+      const prevMonthKey = `${ySel-1}-12`;
+      const prevVal = mm.get(prevMonthKey) || 0;
+      if(prevVal>0) momVal = (kwhCur-prevVal)/prevVal*100;
+    }else{
+      const prevMonthKey = `${ySel}-${KTT.MONTH_LABEL(m-1)}`;
+      const prevVal = mm.get(prevMonthKey) || 0;
+      if(prevVal>0) momVal = (kwhCur-prevVal)/prevVal*100;
+    }
+    momSpark.push(momVal);
+
+    // YoY YTD
+    let yoyVal = null;
+    if(ytdPrev>0){
+      yoyVal = (ytdCur-ytdPrev)/ytdPrev*100;
+    }
+    yoySpark.push(yoyVal);
+  }
+
+  SPARK = { labels:labelsSpark, ener:enerSpark, mom:momSpark, yoy:yoySpark };
+
+  // Line chart with click callback
+  if(lineChart){ lineChart.destroy(); lineChart=null; }
+    if(lineChartYTD){ lineChartYTD.destroy(); lineChartYTD=null; }
+  const yearsAvailable = [...new Set(dimAll.map(r=>r.TAHUN))].sort((a,b)=>a-b);
+  renderYearToggles(yearsAvailable, ySel);
+
+  lineChart = KTT.drawLine('lineTrend', ySel, mm, lastM, activeM, (m)=>{
+    SELECTED_MONTH = (SELECTED_MONTH === m) ? null : m;
+    applyFilters();
+  }, Array.from(SHOW_YEARS));
+
+  // ---- chart kumulatif (YTD) ----
+  if (document.getElementById('lineTrendYTD')) {
+    // build cumulative map dari mm (kWh), hanya sampai last month per tahun (agar tidak "maksa" sampai Des)
+    const yearsAll = yearsAvailable.slice(); // already computed
+    const cumMap = new Map();
+
+    function lastMonthYear(yy){
+      for(let m=12;m>=1;m--){
+        const k = `${yy}-${KTT.MONTH_LABEL(m)}`;
+        const v = mm.get(k);
+        if(v!=null && v!==0) return m;
+      }
+      return 0;
+    }
+
+    yearsAll.forEach(yy=>{
+      const lm = lastMonthYear(yy);
+      let run = 0;
+      for(let m=1;m<=lm;m++){
+        const k = `${yy}-${KTT.MONTH_LABEL(m)}`;
+        run += (mm.get(k) || 0);
+        cumMap.set(k, run);
+      }
+    });
+
+    if(lineChartYTD){ lineChartYTD.destroy(); lineChartYTD = null; }
+    lineChartYTD = KTT.drawLine('lineTrendYTD', ySel, cumMap, lastM, activeM, (m)=>{
+      SELECTED_MONTH = (SELECTED_MONTH === m) ? null : m;
+      applyFilters();
+    }, Array.from(SHOW_YEARS));
+  }
+// Pie industri pakai YTD sesuai bulan aktif
+  const byInd=new Map();
+  YTD.forEach(r=>{
+    const k=r.JENIS||'(Tidak Diisi)';
+    byInd.set(k,(byInd.get(k)||0)+(r.KWH||0));
+  });
+  const arrPie=[...byInd.entries()].sort((a,b)=>b[1]-a[1]).slice(0,12);
+  if(pieChart){ pieChart.destroy(); pieChart=null; }
+  pieChart = KTT.drawPie('pieIndustri', arrPie.map(x=>x[0]), arrPie.map(x=>x[1]), (idx)=>{
+    const label = arrPie[idx][0];
+    KTT.goIndustri(String(label||'(Tidak Diisi)').toUpperCase(), $('#filterUID').val(), $('#filterYear').val());
+  });
+
+  renderTopTable(YTD, dimYr, activeM);
+
+  $('#periodInfo').text(
+    activeM
+      ? `Cumulative ${ySel} (s.d. ${KTT.MONTHS[activeM]})`
+      : `Tidak ada data untuk ${ySel}`
+  );
+}
+
+function renderTopTable(YTD, dimYr, activeM){
+  const acc = new Map();
+
+  // Total MWh (Cumulative) dari YTD
+  (YTD||[]).forEach(r=>{
+    if(!r.IDPEL) return;
+    const id = String(r.IDPEL).trim();
+    if(!id) return;
+
+    const nm = (LABELS.get(id) || KTT.prettyName(r.NAMA,id));
+    const jenis = (r.JENIS||'(Tidak Diisi)');
+
+    const cur = acc.get(id) || { idpel:id, nama:nm, jenis, mwh:0, mwhMonth:0, daya:0 };
+    cur.mwh += (r.KWH||0)/1000;
+
+    const d = KTT.toNumber(r.DAYA||0);
+    if(d>0) cur.daya = Math.max(cur.daya||0, d);
+
+    if(KTT.isBadName(cur.nama) && !KTT.isBadName(nm)) cur.nama = nm;
+    acc.set(id,cur);
+  });
+
+  // Pemakaian bulan terpilih (MWh) dari dimYr untuk bulan activeM
+  if(activeM){
+    (dimYr||[]).forEach(r=>{
+      if(!r.IDPEL) return;
+      if(r.BULAN !== activeM) return;
+      const id = String(r.IDPEL).trim();
+      if(!id) return;
+      const cur = acc.get(id) || { idpel:id, nama:(LABELS.get(id)||KTT.prettyName(r.NAMA,id)), jenis:(r.JENIS||'(Tidak Diisi)'), mwh:0, mwhMonth:0, daya:0 };
+      cur.mwhMonth += (r.KWH||0)/1000;
+      const d = KTT.toNumber(r.DAYA||0);
+      if(d>0) cur.daya = Math.max(cur.daya||0, d);
+      acc.set(id,cur);
+    });
+  }
+
+  const rows = [...acc.values()]
+    .sort((a,b)=> (b.mwh||0) - (a.mwh||0))
+    .slice(0,50);
+
+  const monthLabel = (activeM>=1 && activeM<=12) ? KTT.MONTHS[activeM] : 'Bulan';
+
+  if($.fn.dataTable.isDataTable('#tblAll')) $('#tblAll').DataTable().destroy();
+  $('#tblAll tbody').empty();
+
+  const dt = new DataTable('#tblAll',{
+    data: rows.map((r,i)=>[
+      i+1,
+      r.nama,
+      Math.round(r.daya||0),
+      r.jenis,
+      Math.round(r.mwhMonth||0),
+      Math.round(r.mwh||0)
+    ]),
+    columns: [
+      {title:'#'},
+      {title:'Nama'},
+      {title:'Daya (kVA)'},
+      {title:'Industri'},
+      {title:`Pemakaian ${monthLabel} (MWh)`},
+      {title:'Total MWh'}
+    ],
+    order:[[5,'desc']],
+    pageLength:25,
+    columnDefs:[
+      { targets:0, width:'56px' },
+      {
+        targets:[2,4,5],
+        className:'text-end',
+        render: function(data, type){
+          if(type === 'display') return KTT.nf.format(data);
+          return data;
+        }
+      }
+    ]
+  });
+
+  $('#tblAll tbody').off('click').on('click','tr',function(){
+    const idx = dt.row(this).index();
+    if(idx==null) return;
+    const idpel = rows[idx].idpel;
+    KTT.goPelanggan(idpel, $('#filterUID').val(), $('#filterYear').val());
+  });
+
+  $('#btnExport').off().on('click', ()=>{
+    const ws = XLSX.utils.json_to_sheet(
+      rows.map((x,i)=>({
+        No:i+1,
+        Nama:x.nama,
+        'Daya (kVA)': Math.round(x.daya||0),
+        Industri:x.jenis,
+        [`Pemakaian ${monthLabel} (MWh)`]: Math.round(x.mwhMonth||0),
+        'Total MWh': Math.round(x.mwh||0)
+      }))
+    );
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Top Pelanggan');
+    XLSX.writeFile(wb,`Top_Pelanggan_${monthLabel}.xlsx`);
+  });
+}
+
+/* --------- sparkline popover --------- */
+function showSpark(e, type){
+  if(!SPARK.labels.length) return;
+  const pop = $('#sparkPopover');
+  const canvas = document.getElementById('sparkCanvas');
+  const ctx = canvas.getContext('2d');
+
+  if(sparkChart){ sparkChart.destroy(); sparkChart=null; }
+
+  let data = [];
+  let labelText = '';
+  if(type==='ener'){ data = SPARK.ener; labelText='YTD GWh'; }
+  else if(type==='mom'){ data = SPARK.mom; labelText='MoM %'; }
+  else if(type==='yoy'){ data = SPARK.yoy; labelText='YoY YTD %'; }
+
+  sparkChart = new Chart(ctx,{
+    type:'line',
+    data:{
+      labels: SPARK.labels,
+      datasets:[{
+        data,
+        borderWidth:1.3,
+        pointRadius:2,
+        hitRadius:6,
+        tension:.3
+      }]
+    },
+    options:{
+      responsive:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          callbacks:{
+            label: c=>{
+              const v = c.parsed.y;
+              if(v==null) return '';
+              const val = v.toFixed(2);
+              if(type==='ener') return `${c.label}: ${val} GWh`;
+              return `${c.label}: ${val}%`;
+            }
+          }
+        },
+        datalabels:{
+          // Tampilkan label hanya untuk grafik persentase
+          display: type!=='ener',
+          align:'top',
+          anchor:'end',
+          clamp:true,
+          offset: -2,
+          formatter: (v)=>{
+            if(v==null) return '';
+            return v.toFixed(1)+'%';
+          },
+          font:{ size:8 }
+        }
+      },
+      scales:{
+        x:{
+          display:true,
+          grid:{display:false},
+          ticks:{
+            font:{size:8},
+            maxRotation:0,
+            autoSkip:true,
+            autoSkipPadding:8
+          }
+        },
+        y:{
+          display:true,
+          grid:{display:false},
+          ticks:{
+            font:{size:8},
+            callback: (val)=>{
+              if(type==='ener') return val.toFixed(1);   // GWh
+              return val.toFixed(1)+'%';                 // persen
+            }
+          }
+        }
+      }
+    }
+  });
+
+  const $target = $(e.currentTarget);
+  const off = $target.offset();
+  const top = off.top + $target.outerHeight();
+  const left = off.left;
+  pop.css({top: top+'px', left:left+'px'}).show();
+}
+
+function hideSpark(){
+  $('#sparkPopover').hide();
+  if(sparkChart){ sparkChart.destroy(); sparkChart=null; }
+}
+
+/* ------------------ UI wiring ------------------ */
+$(document).ready(()=>{
+  const loaded = KTT.loadSession();
+  if(loaded.ok){
+    // restore unit prefs
+    const ue = localStorage.getItem('KTT_UNIT_ENERGI'); if(ue) $('#unitEnergi').val(ue);
+    const ud = localStorage.getItem('KTT_UNIT_DAYA'); if(ud) $('#unitDaya').val(ud);
+    DATA=loaded.DATA; LABELS=loaded.LABELS;
+    buildFilters();
+    const years=[...new Set(DATA.map(r=>r.TAHUN))].sort((a,b)=>a-b);
+    const latest = years.at(-1);
+    if(latest!=null) $('#filterYear').val(String(latest));
+    applyFilters();
+  }
+
+  $('#filterUID,#filterYear,#filterIndustri').on('change', ()=>{
+    SELECTED_MONTH=null;
+    applyFilters();
+  });
+
+  $('#fileInput').on('change', async e=>{
+    const f = e.target.files[0];
+    if(!f) return;
+    try{
+      const parsed = await KTT.parseExcelFile(f);
+      DATA = parsed.DATA;
+      LABELS = parsed.LABELS;
+      KTT.saveSession(DATA,LABELS,{source:f.name,page:location.pathname});
+      buildFilters();
+      const years=[...new Set(DATA.map(r=>r.TAHUN))].sort((a,b)=>a-b);
+      const latest = years.at(-1);
+      if(latest!=null) $('#filterYear').val(String(latest));
+      SELECTED_MONTH=null;
+      applyFilters();
+    }catch(err){
+      alert(String(err));
+      console.error(err);
+    }
+  });
+
+  $('#btnReset').on('click', ()=>{
+    $('#fileInput').val('');
+    DATA=[]; LABELS=new Map();
+    KTT.clearSession();
+    if(lineChart){ lineChart.destroy(); lineChart=null; }
+    if(lineChartYTD){ lineChartYTD.destroy(); lineChartYTD=null; }
+    if(pieChart){ pieChart.destroy(); pieChart=null; }
+    if($.fn.dataTable.isDataTable('#tblAll')) $('#tblAll').DataTable().destroy();
+    $('#filterUID').html('<option value="ALL">Semua</option>');
+    $('#filterYear').html('');
+    $('#filterIndustri').html('<option value="ALL">Semua</option>');
+    $('#kpiEnergi,#kpiDaya,#kpiJumlahPelanggan').text('-');
+    $('#kpiEnergiLabel').text('Energi s.d. —');
+    $('#kpiYoY').text('-');
+    $('#kpiMoM').text('0%');
+    $('#labelMoM').text('');
+    $('#labelYoY').text('');
+    $('#periodInfo').text('—');
+    $('#komposisiTarif').html('');
+    $('#komposisiSummary').text('Klik untuk detail');
+    $('#komposisiBody').addClass('d-none');
+    SPARK = {labels:[],ener:[],mom:[],yoy:[]};
+    localStorage.removeItem('KTT_UNIT_ENERGI');
+    localStorage.removeItem('KTT_UNIT_DAYA');
+    $('#unitEnergi').val('MWh');
+    $('#unitDaya').val('MVA');
+  });
+
+  $('#komposisiHeader').on('click', function(){
+    $('#komposisiBody').toggleClass('d-none');
+  });
+
+  // hover untuk sparkline
+  $('#titleEnergi').on('mouseenter', e=>showSpark(e,'ener')).on('mouseleave', hideSpark);
+  $('#titleMoM').on('mouseenter', e=>showSpark(e,'mom')).on('mouseleave', hideSpark);
+  $('#titleYoY').on('mouseenter', e=>showSpark(e,'yoy')).on('mouseleave', hideSpark);
+});
+</script>
+</body>
+</html>

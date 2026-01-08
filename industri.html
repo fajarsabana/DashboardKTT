@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>KTT Dashboard — Industri</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css" rel="stylesheet">
+<link href="https://cdn.datatables.net/v/bs5/dt-2.1.8/datatables.min.css" rel="stylesheet">
+
+
+<style>
+  body{background:#f3f3f4}
+  .sidebar{width:250px;background:#2f4050;color:#cfd8dc;position:fixed;height:100%;left:0;top:0}
+  .sidebar .brand{padding:18px 20px;font-weight:700;color:#fff;background:#293846}
+  .sidebar a{display:block;color:#cfd8dc;padding:10px 20px;text-decoration:none}
+  .sidebar a.active,.sidebar a:hover{background:#243342;color:#fff}
+  .content{margin-left:250px;padding:20px}
+  .ibox{background:#fff;border:1px solid #e7eaec;border-radius:8px;margin-bottom:16px;position:relative}
+  .ibox-title{padding:12px 16px;border-bottom:1px solid #e7eaec;font-weight:600;display:flex;align-items:center;gap:.5rem;position:relative}
+  .ibox-content{padding:16px}
+  .kpi .val{font-size:1.8rem;font-weight:700}
+  .up{color:#1ab394}.down{color:#e74c3c}
+  .pill{font-size:.75rem;padding:.25rem .5rem;background:#eef2f6;border-radius:999px}
+  canvas { background: #fff; border-radius:6px; }
+  .hint{font-size:.85rem;color:#6c757d}
+</style>
+
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand"><i class="fa-solid fa-bolt me-2"></i>KTT Dashboard</div>
+  <a href="index.html" class=""><i class="fa-solid fa-gauge me-2"></i>Dashboard</a>
+  <a href="industri.html" class="active"><i class="fa-solid fa-industry me-2"></i>Industri</a>
+  <a href="pelanggan.html" class=""><i class="fa-solid fa-users me-2"></i>Pelanggan</a>
+</aside>
+
+<main class="content">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h4 class="fw-semibold mb-0">Industri — Detail</h4>
+      <div class="hint">Klik pie/table untuk buka detail pelanggan.</div>
+    </div>
+    <div class="d-flex gap-2">
+      <input id="fileInput" type="file" accept=".xlsx,.xls" class="form-control form-control-sm" style="width:320px">
+      <button id="btnReset" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-rotate"></i> Reset</button>
+    </div>
+  </div>
+
+  <div class="ibox">
+    <div class="ibox-title">Filter</div>
+    <div class="ibox-content">
+      <div class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label">UID</label>
+          <select id="filterUID" class="form-select"><option value="ALL">Semua</option></select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Tahun</label>
+          <select id="filterYear" class="form-select"></select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Industri (JENIS)</label>
+          <select id="filterIndustri" class="form-select"><option value="ALL">Semua</option></select>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+          <span id="periodInfo" class="pill ms-auto">—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-3">
+      <div class="ibox">
+        <div class="ibox-title"><i class="fa-solid fa-bolt me-2 text-warning"></i>Total Energi (GWh) — YTD</div>
+        <div class="ibox-content kpi">
+          <div style="font-size:.9rem" id="kpiEnergiLabel">Energi s.d. —</div>
+          <div id="kpiEnergi" class="val">-</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="ibox">
+        <div class="ibox-title"><i class="fa-solid fa-users me-2"></i>Jumlah Pelanggan (YTD)</div>
+        <div class="ibox-content kpi"><div id="kpiJumlahPelanggan" class="val">-</div></div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="ibox">
+        <div class="ibox-title">
+          <i class="fa-solid fa-arrow-trend-up me-1"></i>Growth MoM
+          <span id="labelMoM" class="ms-1 text-muted small"></span>
+        </div>
+        <div class="ibox-content kpi"><div id="kpiMoM" class="val">0%</div></div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="ibox">
+        <div class="ibox-title">
+          <i class="fa-solid fa-chart-line me-2"></i>Growth YoY (YTD)
+          <span id="labelYoY" class="ms-1 text-muted small"></span>
+        </div>
+        <div class="ibox-content kpi"><div id="kpiYoY" class="val">-</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="ibox">
+        <div class="ibox-title d-flex justify-content-between align-items-center"><span><i class="fa-solid fa-chart-line me-2"></i>Tren Energi Industri (GWh) — klik bulan untuk pilih</span><div class="d-flex align-items-center gap-2"><span class="text-muted small">Tampilkan tahun:</span><div class="d-flex flex-wrap gap-2" id="yearTogglesInd"></div></div></div>
+        <div class="ibox-content"><canvas id="lineTrend" height="280"></canvas></div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="ibox">
+        <div class="ibox-title"><i class="fa-solid fa-chart-pie me-2"></i>Top Pelanggan Share (YTD)</div>
+        <div class="ibox-content"><canvas id="pieTop" height="240"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ibox">
+    <div class="ibox-title d-flex justify-content-between align-items-center">
+      <span id="tblTitle">Daftar Pelanggan Industri — YTD</span>
+      <button id="btnExport" class="btn btn-outline-success btn-sm"><i class="fa-solid fa-file-excel"></i> Export</button>
+    </div>
+    <div class="ibox-content">
+      <table id="tblTop" class="table table-striped" style="width:100%">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>IDPEL</th>
+            <th>Nama</th>
+            <th>Tarif</th>
+            <th class="text-end">Pemakaian Bulan (MWh)</th>
+            <th class="text-end">Total YTD (MWh)</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="hint mt-2" id="statusText">—</div>
+    </div>
+  </div>
+
+  <div class="text-center text-muted py-3">© 2025 KTT Dashboard — Industri</div>
+</main>
+
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/v/bs5/dt-2.1.8/datatables.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+
+<script>
+// register plugin datalabels kalau ada
+if (window.Chart && window.ChartDataLabels) {
+  Chart.register(window.ChartDataLabels);
+}
+
+const KTT = (function(){
+  const nf = new Intl.NumberFormat('id-ID');
+  const MONTHS = {
+    1:'JAN',2:'FEB',3:'MAR',4:'APR',5:'MEI',6:'JUN',7:'JUL',
+    8:'AGS',9:'SEP',10:'OKT',11:'NOV',12:'DES'
+  };
+  const MONTH_LABEL = (m)=>String(m).padStart(2,'0');
+
+  function isBadName(n){
+    const s=String(n||'').trim();
+    if(!s) return true;
+    return /^[0-9.,]+$/.test(s);
+  }
+  function prettyName(n,id){
+    const s=String(n||'').trim();
+    if(!isBadName(s)) return s;
+    const i=String(id||'').replace(/\.0+$/,'').trim();
+    return i?('IDPEL '+i):'(Tanpa Nama)';
+  }
+
+  async function parseExcelFile(file){
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf,{type:'array'});
+    const sheetName = wb.SheetNames.includes("DATA PEMAKAIAN PER BULAN")
+      ? "DATA PEMAKAIAN PER BULAN"
+      : wb.SheetNames[0];
+    const ws = wb.Sheets[sheetName];
+    const A = XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+    const H0=A[0]||[], H1=A[1]||[];
+
+    const ID_MONTHS = {
+      'JAN':1,'JANUARI':1,
+      'FEB':2,'FEBRUARI':2,
+      'MAR':3,'MARET':3,
+      'APR':4,'APRIL':4,
+      'MEI':5,'MAY':5,
+      'JUN':6,'JUNI':6,
+      'JUL':7,'JULI':7,
+      'AGU':8,'AGS':8,'AGT':8,'AGST':8,'AGUSTUS':8,
+      'SEP':9,'SEPT':9,'SEPTEMBER':9,
+      'OKT':10,'OCT':10,'OKTOBER':10,
+      'NOV':11,'NOVEMBER':11,
+      'DES':12,'DEC':12,'DESEMBER':12
+    };
+
+    function extractMonthFromCell(h0,h1){
+      const txt = ((h0||'')+' '+(h1||'')).toUpperCase();
+      for(const k in ID_MONTHS){
+        if(txt.includes(k)) return ID_MONTHS[k];
+      }
+      const m = txt.match(/(0?[1-9]|1[0-2])/);
+      return m?Number(m[0]):null;
+    }
+
+    // detect year from header (handle "2,025")
+    const yearAt = [];
+    let lastYear = null;
+    for(let c=8;c<Math.max(H0.length,H1.length);c++){
+      const combined = String(H0[c]||'') + ' ' + String(H1[c]||'');
+      const cleaned = combined.replace(/[^\d]/g,'');
+      const m = cleaned.match(/(19|20)\d{2}/);
+      const y = m ? m[0] : null;
+      if(y) lastYear = Number(y);
+      yearAt[c]=lastYear;
+    }
+
+    const monthCols = [];
+    for(let c=8;c<Math.max(H0.length,H1.length);c++){
+      const mon = extractMonthFromCell(H0[c],H1[c]);
+      const y = yearAt[c];
+      if(mon && y) monthCols.push({c, year:y, month:mon});
+    }
+    if(!monthCols.length) throw new Error("Gagal deteksi kolom periode. Cek header sheet.");
+
+    const IDX = {UID:1, PROV:2, IDPEL:3, NAMA:4, JENIS:5, GOLT:6, DAYA:7};
+    const DATA=[];
+    const LABELS = new Map();
+    for(let r=2;r<A.length;r++){
+      const row=A[r]; if(!row) continue;
+      const UID=row[IDX.UID], PROV=row[IDX.PROV], IDPEL=row[IDX.IDPEL],
+            NAMA=row[IDX.NAMA], JENIS=row[IDX.JENIS], GOLT=row[IDX.GOLT], DAYA=row[IDX.DAYA];
+      const upN = String(NAMA||'').toUpperCase(), upU=String(UID||'').toUpperCase();
+      if((!IDPEL && !NAMA) || upN.includes('TOTAL')||upN.includes('JUMLAH')||upU.includes('TOTAL')) continue;
+      for(const mc of monthCols){
+        const raw = row[mc.c];
+        if(raw===null||raw===undefined||raw==='') continue;
+        const kwh = toNumber(raw);
+        DATA.push({
+          UID, PROV,
+          IDPEL:String(IDPEL||'').trim(),
+          NAMA, JENIS, GOLT, DAYA,
+          TAHUN:mc.year, BULAN:mc.month, KWH:kwh
+        });
+        if(IDPEL){
+          const cur = LABELS.get(String(IDPEL)) || null;
+          const cand = prettyName(NAMA,IDPEL);
+          if(!cur) LABELS.set(String(IDPEL), cand);
+          else if(isBadName(cur) && !isBadName(cand)) LABELS.set(String(IDPEL), cand);
+        }
+      }
+    }
+    return {DATA, LABELS};
+  }
+
+  function toNumber(v){
+    if(v==null) return 0;
+    if(typeof v==='number' && isFinite(v)) return v;
+    const s=String(v)
+      .replace(/\s+/g,'')
+      .replace(/\./g,'')
+      .replace(/,/g,'.')
+      .replace(/[^0-9.+-eE]/g,'');
+    const n=parseFloat(s);
+    return isNaN(n)?0:n;
+  }
+
+  function shortNumber(v){
+    const n = Number(v) || 0;
+    const abs = Math.abs(n);
+    let out;
+    if (abs >= 1e9)      out = (n/1e9).toFixed(1) + 'B';
+    else if (abs >= 1e6) out = (n/1e6).toFixed(1) + 'M';
+    else if (abs >= 1e3) out = (n/1e3).toFixed(1) + 'K';
+    else                 out = Math.round(n).toString();
+    return out.replace('.0','');
+  }
+
+  function buildMonthMap(rows){
+    const m = new Map();
+    rows.forEach(r=>{
+      const k = `${r.TAHUN}-${MONTH_LABEL(r.BULAN)}`;
+      m.set(k,(m.get(k)||0)+(r.KWH||0));
+    });
+    return m;
+  }
+
+  function ytdSum(monthMap, year, m){
+    let s=0;
+    for(let i=1;i<=m;i++){
+      s+= (monthMap.get(`${year}-${MONTH_LABEL(i)}`)||0);
+    }
+    return s;
+  }
+
+  function lastActiveMonth(rows){
+    const sums = buildMonthMap(rows);
+    const monthsByYear = {};
+    rows.forEach(r=>{
+      monthsByYear[r.TAHUN] = monthsByYear[r.TAHUN] || new Set();
+      monthsByYear[r.TAHUN].add(r.BULAN);
+    });
+    const years = Object.keys(monthsByYear).map(Number).sort((a,b)=>a-b);
+    if(!years.length) return { last:0, sums };
+    const lastYear = years[years.length-1];
+    const last = Math.max(...Array.from(monthsByYear[lastYear]));
+    return { last, sums };
+  }
+
+    function drawLine(canvasId, year, monthSumsMap, lastM, selectedMonth, onPointClick, extraYears=[]){
+    const labels = [...Array(12)].map((_,i)=>MONTH_LABEL(i+1));
+
+    function lastMonthFromMap(yy){
+      for(let m=12;m>=1;m--){
+        const k = `${yy}-${MONTH_LABEL(m)}`;
+        const v = monthSumsMap.get(k);
+        if(v!=null && v!==0) return m;
+      }
+      return 0;
+    }
+
+    const years = [year, ...(extraYears||[]).filter(y=>y && y!==year)];
+
+    const datasets = years.map((yy)=>{
+      const lm = (yy===year && lastM) ? lastM : lastMonthFromMap(yy);
+      const dataGwh = labels.map((_,i)=>{
+        const mm = i+1;
+        const k = `${yy}-${MONTH_LABEL(mm)}`;
+        const v = monthSumsMap.get(k) || 0;
+        return (mm<=lm) ? (v/1e6) : null; // kWh -> GWh
+      });
+      return {
+        label: `${yy} (GWh)`,
+        data: dataGwh,
+        tension: .3,
+        fill: false,
+        borderWidth: (yy===year ? 2 : 1),
+        borderDash: (yy===year ? [] : [6,4]),
+        pointRadius: (yy===year ? 3 : 2),
+        pointHoverRadius: 4
+      };
+    });
+
+    // adaptive y range (tidak mulai dari 0)
+    const allVals = [];
+    datasets.forEach(ds=>{
+      (ds.data||[]).forEach(v=>{
+        if(v!=null && isFinite(v)) allVals.push(v);
+      });
+    });
+    let suggestedMin = 0, suggestedMax = 0;
+    if(allVals.length){
+      const yMin = Math.min(...allVals);
+      const yMax = Math.max(...allVals);
+      const range = (yMax - yMin);
+      const pad = range > 0 ? range*0.08 : (yMax||1)*0.08;
+      suggestedMin = Math.max(0, yMin - pad);
+      suggestedMax = yMax + pad;
+    }
+
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    const chart = new Chart(ctx, {
+      type:'line',
+      data:{ labels, datasets },
+      options:{
+        responsive:true,
+        maintainAspectRatio:false,
+        scales:{
+          y:{
+            beginAtZero:false,
+            suggestedMin,
+            suggestedMax,
+            ticks:{ callback: v => `${Number(v).toFixed(2)} GWh` }
+          }
+        },
+        plugins:{
+          tooltip:{
+            mode:'index',
+            intersect:false,
+            callbacks:{
+              label: ctx => {
+                const val = ctx.parsed.y;
+                if(val==null) return '';
+                return `${ctx.dataset.label}: ${val.toFixed(2)} GWh`;
+              }
+            }
+          },
+          datalabels:{
+            // label hanya untuk tahun utama biar tidak rame
+            display: (context)=> context.datasetIndex === 0,
+            align:'top',
+            anchor:'end',
+            clamp:true,
+            formatter: v => (v ? v.toFixed(2) : ''),
+            font:{ size:10 }
+          }
+        }
+      }
+    });
+
+    document.getElementById(canvasId).onclick = function(evt){
+      const pts = chart.getElementsAtEventForMode(evt,'nearest',{intersect:true},true);
+      if(!pts.length) return;
+      const idx = pts[0].index;
+      const clicked = idx+1;
+      if(lastM && clicked>lastM) return; // batasi klik sesuai tahun utama
+      if(typeof onPointClick === 'function') onPointClick(clicked);
+    };
+    return chart;
+  }
+
+  function drawPie(canvasId, labels, data, onClickIdx){
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    const total = data.reduce((a,b)=>a+b,0) || 1;
+
+    const chart = new Chart(ctx,{
+      type:'pie',
+      data:{ labels, datasets:[{ data }] },
+      options:{
+        responsive:true,
+        plugins:{
+          tooltip:{
+            callbacks:{
+              label: ctx => {
+                const v   = ctx.parsed;
+                const pct = v/total*100;
+                return `${ctx.label}: ${shortNumber(v)} (${pct.toFixed(1)}%)`;
+              }
+            }
+          },
+          datalabels:{
+            formatter: v => {
+              const pct = v/total*100;
+              return pct >= 3 ? pct.toFixed(1)+'%' : '';
+            },
+            color:'#fff',
+            font:{ size:9 }
+          }
+        }
+      }
+    });
+
+    if(typeof onClickIdx === 'function'){
+      document.getElementById(canvasId).onclick = function(evt){
+        const el = chart.getElementsAtEventForMode(evt,'nearest',{intersect:true},true);
+        if(!el.length) return;
+        onClickIdx(el[0].index);
+      };
+    }
+    return chart;
+  }
+
+  function setDataTable(selector, options={}, rows=[], onReady){
+    if($.fn.dataTable.isDataTable(selector)) $(selector).DataTable().destroy();
+    $(selector+' tbody').empty();
+    const table = $(selector).DataTable(Object.assign({
+      data: rows,
+      columns: Array.from({length: (rows[0]||[]).length}, (_,i)=>({title: '', defaultContent:''})),
+      paging: true
+    }, options));
+    if(typeof onReady==='function') onReady(table);
+    return table;
+  }
+
+  function saveSession(DATA, LABELS, meta={}){
+    try{
+      localStorage.setItem('KTT_DATA', JSON.stringify(DATA));
+      const o = {};
+      LABELS.forEach((v,k)=> o[k]=v);
+      localStorage.setItem('KTT_LABELS', JSON.stringify(o));
+      localStorage.setItem('KTT_META', JSON.stringify(meta));
+      return true;
+    }catch(e){ return false; }
+  }
+  function loadSession(){
+    try{
+      const D = JSON.parse(localStorage.getItem('KTT_DATA')||'[]');
+      const L = JSON.parse(localStorage.getItem('KTT_LABELS')||'{}');
+      const map = new Map(Object.entries(L));
+      return { ok:true, DATA:D, LABELS:map };
+    }catch(e){ return { ok:false }; }
+  }
+  function clearSession(){
+    localStorage.removeItem('KTT_DATA');
+    localStorage.removeItem('KTT_LABELS');
+    localStorage.removeItem('KTT_META');
+  }
+
+  function getQuery(){
+    const qs = (location.search||'').replace(/^\?/,'');
+    const o={};
+    qs.split('&').forEach(p=>{
+      if(!p) return;
+      const kv = p.split('=');
+      o[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1]||'');
+    });
+    return o;
+  }
+
+  function goIndustri(ind, uid, year){
+    const url = `industri.html?ind=${encodeURIComponent(ind||'')}&uid=${encodeURIComponent(uid||'')}&year=${encodeURIComponent(year||'')}`;
+    location.href = url;
+  }
+  function goPelanggan(idpel, uid, year){
+    const url = `pelanggan.html?pel=${encodeURIComponent(idpel||'')}&uid=${encodeURIComponent(uid||'')}&year=${encodeURIComponent(year||'')}`;
+    location.href = url;
+  }
+
+  return {
+    nf, MONTHS, MONTH_LABEL, prettyName, isBadName,
+    parseExcelFile, toNumber, buildMonthMap, ytdSum, lastActiveMonth,
+    drawLine, drawPie, setDataTable,
+    saveSession, loadSession, clearSession, getQuery,
+    goIndustri, goPelanggan,
+    shortNumber
+  };
+})();
+// ----------------------- END CORE -----------------------
+
+let DATA = [];
+let LABELS = new Map();
+let lineChart = null;
+let pieChart  = null;
+let SELECTED_MONTH = null;
+let SHOW_YEARS = new Set(JSON.parse(localStorage.getItem('KTT_SHOW_YEARS_IND') || '[]'));
+
+function renderYearToggles(years, selectedYear){
+  const wrap = document.getElementById('yearTogglesInd');
+  if(!wrap) return;
+
+  const prevYears = (years||[]).filter(y=>y && y<selectedYear).sort((a,b)=>b-a);
+
+  // bersihkan tahun yang tidak relevan
+  SHOW_YEARS.forEach(y=>{ if(!prevYears.includes(y)) SHOW_YEARS.delete(y); });
+
+  wrap.innerHTML = '';
+  if(!prevYears.length){
+    wrap.innerHTML = '<span class="text-muted small">—</span>';
+    localStorage.setItem('KTT_SHOW_YEARS_IND', JSON.stringify(Array.from(SHOW_YEARS)));
+    return;
+  }
+
+  prevYears.forEach(y=>{
+    const id = 'yearTogglesInd_' + y;
+    const div = document.createElement('div');
+    div.className = 'form-check form-check-inline m-0';
+    div.innerHTML = `
+      <input class="form-check-input" type="checkbox" id="${id}" ${SHOW_YEARS.has(y)?'checked':''}>
+      <label class="form-check-label small" for="${id}">${y}</label>
+    `;
+    div.querySelector('input').addEventListener('change', (e)=>{
+      if(e.target.checked) SHOW_YEARS.add(y);
+      else SHOW_YEARS.delete(y);
+      localStorage.setItem('KTT_SHOW_YEARS_IND', JSON.stringify(Array.from(SHOW_YEARS)));
+      applyFilters();
+    });
+    wrap.appendChild(div);
+  });
+
+  localStorage.setItem('KTT_SHOW_YEARS_IND', JSON.stringify(Array.from(SHOW_YEARS)));
+}
+let dtTop = null;
+
+function setStatus(msg) {
+  document.getElementById('statusText').textContent = msg || '—';
+}
+
+function normalizeIndOption(ind) {
+  if (!ind) return null;
+  const up = String(ind).trim().toUpperCase();
+  const sel = document.getElementById('filterIndustri');
+  for (const opt of sel.options) {
+    if (String(opt.value).trim().toUpperCase() === up) return opt.value;
+  }
+  return ind;
+}
+
+function buildFilters() {
+  const uids=[...new Set(DATA.map(r=>r.UID).filter(x=>String(x||'').trim()!==''))].sort();
+  $('#filterUID').html('<option value="ALL">Semua</option>'+uids.map(x=>`<option>${x}</option>`));
+
+  const years=[...new Set(DATA.map(r=>r.TAHUN))].sort((a,b)=>a-b);
+  $('#filterYear').html(years.map(y=>`<option value="${y}">${y}</option>`));
+
+  const inds=[...new Set(DATA.map(r=>r.JENIS||'(Tidak Diisi)'))].sort();
+  $('#filterIndustri').html('<option value="ALL">Semua</option>'+inds.map(x=>`<option>${x}</option>`));
+}
+
+function applyQueryDefaults() {
+  const q = KTT.getQuery();
+  if (q.uid) $('#filterUID').val(q.uid);
+  if (q.year) $('#filterYear').val(q.year);
+  if (q.ind) {
+    const v = normalizeIndOption(q.ind);
+    $('#filterIndustri').val(v);
+  }
+}
+
+function applyFilters() {
+  if(!DATA.length) {
+    setStatus('Belum ada data. Upload Excel di kanan atas.');
+    return;
+  }
+
+  const fUID = $('#filterUID').val();
+  const ySel = +$('#filterYear').val();
+  const fInd = $('#filterIndustri').val();
+
+  const dimAll = DATA.filter(r =>
+    (fUID === 'ALL' || String(r.UID) === fUID) &&
+    (fInd === 'ALL' || String(r.JENIS || '(Tidak Diisi)') === fInd)
+  );
+  const dimYr = dimAll.filter(r => r.TAHUN === ySel);
+
+  const mm = KTT.buildMonthMap(dimAll);
+  const { last: lastM, sums } = KTT.lastActiveMonth(dimYr);
+
+  let activeM = SELECTED_MONTH || lastM;
+  if (!activeM || activeM > lastM) activeM = lastM || 0;
+
+  // info label
+  const indLabel = (fInd==='ALL') ? 'Semua Industri' : fInd;
+  document.getElementById('tblTitle').textContent = `Daftar Pelanggan — ${indLabel} (YTD)`;
+  $('#periodInfo').text(activeM ? `YTD ${ySel} (s.d. ${KTT.MONTHS[activeM]})` : `Tidak ada data untuk ${ySel}`);
+
+  // KPI energi
+  const tot_kWh = activeM ? KTT.ytdSum(mm, ySel, activeM) : 0;
+  $('#kpiEnergi').text(activeM ? KTT.nf.format(Math.round(tot_kWh / 1e6 * 100)/100) : '-');
+  $('#kpiEnergiLabel').text(activeM ? `Energi s.d. ${KTT.MONTHS[activeM]}` : 'Energi s.d. —');
+
+  // KPI jumlah pelanggan (YTD)
+  const YTD = activeM ? dimYr.filter(r => r.BULAN>=1 && r.BULAN<=activeM) : [];
+  const idset = new Set(YTD.map(r=>String(r.IDPEL||'').trim()).filter(Boolean));
+  $('#kpiJumlahPelanggan').text(KTT.nf.format(idset.size));
+
+  // YoY (YTD)
+  let yoy = '–';
+  $('#kpiYoY').removeClass('up down');
+  $('#labelYoY').text(activeM ? `(s.d. ${KTT.MONTHS[activeM]})` : '');
+  if (activeM) {
+    const cur  = KTT.ytdSum(mm, ySel,   activeM);
+    const prev = KTT.ytdSum(mm, ySel-1, activeM);
+    if (prev > 0) {
+      const v = ((cur - prev) / prev) * 100;
+      yoy = (v>0?'+':'') + v.toFixed(2) + '%';
+      if (v > 0) $('#kpiYoY').addClass('up');
+      else if (v < 0) $('#kpiYoY').addClass('down');
+    }
+  }
+  $('#kpiYoY').text(yoy);
+
+  // MoM
+  let mom = '0%';
+  $('#kpiMoM').removeClass('up down');
+  $('#labelMoM').text('');
+  if (activeM) {
+    const curKey = `${ySel}-${KTT.MONTH_LABEL(activeM)}`;
+    const curVal = mm.get(curKey) || 0;
+
+    const py = (activeM === 1) ? ySel - 1 : ySel;
+    const pm = (activeM === 1) ? 12       : (activeM - 1);
+    const prevKey = `${py}-${KTT.MONTH_LABEL(pm)}`;
+    const prevVal = mm.get(prevKey) || 0;
+
+    const curLabel  = KTT.MONTHS[activeM];
+    const prevLabel = KTT.MONTHS[pm] + (py !== ySel ? ` ${py}` : '');
+    $('#labelMoM').text(`(${curLabel} vs ${prevLabel})`);
+
+    if (prevVal > 0) {
+      const v = ((curVal - prevVal) / prevVal) * 100;
+      mom = (v>0?'+':'') + v.toFixed(2) + '%';
+      if (v > 0) $('#kpiMoM').addClass('up');
+      else if (v < 0) $('#kpiMoM').addClass('down');
+    }
+  }
+  $('#kpiMoM').text(mom);
+
+  // chart line (pakai sums dari dimYr)
+  if(lineChart) { lineChart.destroy(); lineChart=null; }
+
+  const yearsAvailable = [...new Set(dimAll.map(r=>r.TAHUN))].sort((a,b)=>a-b);
+  renderYearToggles(yearsAvailable, ySel);
+
+  lineChart = KTT.drawLine('lineTrend', ySel, mm, lastM, activeM, (m)=>{
+    SELECTED_MONTH = (SELECTED_MONTH === m) ? null : m;
+    applyFilters();
+  }, Array.from(SHOW_YEARS));
+
+  // pie top pelanggan (YTD)
+  const byPel = new Map();
+  for (const r of YTD) {
+    const id = String(r.IDPEL||'').trim(); if(!id) continue;
+    byPel.set(id, (byPel.get(id)||0) + (r.KWH||0));
+  }
+  const sorted = [...byPel.entries()].sort((a,b)=>b[1]-a[1]);
+  const top = sorted.slice(0,6).map(([id,v])=>({id, v}));
+  const others = sorted.slice(6).reduce((s, x)=>s+x[1], 0);
+
+  const pieItems = [...top];
+  if (others>0) pieItems.push({id:'__OTHERS__', v:others});
+
+  const pieLabels = pieItems.map(x => x.id==='__OTHERS__' ? 'Lainnya' : (LABELS.get(x.id) || ('IDPEL '+x.id)));
+  const pieVals   = pieItems.map(x => x.v);
+
+  if(pieChart) { pieChart.destroy(); pieChart=null; }
+  pieChart = KTT.drawPie('pieTop', pieLabels, pieVals, (idx)=>{
+    const picked = pieItems[idx];
+    if (!picked || picked.id==='__OTHERS__') return;
+    KTT.goPelanggan(picked.id, fUID==='ALL'?'':fUID, String(ySel));
+  });
+
+  renderTable(dimAll, dimYr, ySel, activeM);
+
+  setStatus(`Rows: ${dimYr.length} • Pelanggan YTD: ${idset.size}`);
+}
+
+function renderTable(dimAll, dimYr, ySel, activeM) {
+  // agg YTD dan bulan terpilih
+  const acc = new Map();
+
+  // total YTD (MWh)
+  for (const r of dimYr) {
+    if(!r.IDPEL) continue;
+    if(activeM && r.BULAN>activeM) continue;
+    const id = String(r.IDPEL).trim();
+    const nm = LABELS.get(id) || KTT.prettyName(r.NAMA, id);
+    const tarif = r.GOLT || '';
+    const cur = acc.get(id) || {id, nama:nm, tarif, ytd:0, month:0};
+    cur.ytd += (r.KWH||0)/1000;
+    if(!cur.tarif && tarif) cur.tarif = tarif;
+    if (KTT.isBadName(cur.nama) && !KTT.isBadName(nm)) cur.nama = nm;
+    acc.set(id, cur);
+  }
+
+  // bulan terpilih (MWh)
+  if(activeM) {
+    for (const r of dimYr) {
+      if(!r.IDPEL) continue;
+      if(Number(r.BULAN)!==Number(activeM)) continue;
+      const id = String(r.IDPEL).trim();
+      const nm = LABELS.get(id) || KTT.prettyName(r.NAMA, id);
+      const tarif = r.GOLT || '';
+      const cur = acc.get(id) || {id, nama:nm, tarif, ytd:0, month:0};
+      cur.month += (r.KWH||0)/1000;
+      if(!cur.tarif && tarif) cur.tarif = tarif;
+      if (KTT.isBadName(cur.nama) && !KTT.isBadName(nm)) cur.nama = nm;
+      acc.set(id, cur);
+    }
+  }
+
+  const rows = [...acc.values()].sort((a,b)=>b.ytd-a.ytd);
+
+  if($.fn.dataTable.isDataTable('#tblTop')) $('#tblTop').DataTable().destroy();
+  $('#tblTop tbody').empty();
+
+  dtTop = new DataTable('#tblTop', {
+    data: rows.map((r,i)=>[
+      i+1,
+      r.id,
+      r.nama,
+      r.tarif || '-',
+      Math.round(r.month||0),
+      Math.round(r.ytd||0)
+    ]),
+    columns: [
+      { title:'#' },
+      { title:'IDPEL' },
+      { title:'Nama' },
+      { title:'Tarif' },
+      { title:`Pemakaian ${activeM?KTT.MONTHS[activeM]:'Bulan'} (MWh)`, className:'text-end' },
+      { title:'Total YTD (MWh)', className:'text-end' }
+    ],
+    pageLength: 25,
+    order: [[5,'desc']]
+  });
+
+  // row click -> pelanggan
+  $('#tblTop tbody').off('click').on('click','tr', function() {
+    const data = dtTop.row(this).data();
+    if(!data) return;
+    const idpel = data[1];
+    const uid = $('#filterUID').val();
+    const year = $('#filterYear').val();
+    KTT.goPelanggan(idpel, uid==='ALL'?'':uid, year);
+  });
+}
+
+function exportTable() {
+  if(!dtTop) return;
+  const rows = dtTop.rows({search:'applied'}).data().toArray().map(r=>({
+    No: r[0],
+    IDPEL: r[1],
+    Nama: r[2],
+    Tarif: r[3],
+    Pemakaian_Bulan_MWh: r[4],
+    Total_YTD_MWh: r[5]
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Industri');
+  XLSX.writeFile(wb, 'ktt_industri.xlsx');
+}
+
+async function loadFromFile(file) {
+  const parsed = await KTT.parseExcelFile(file);
+  DATA = parsed.DATA;
+  LABELS = parsed.LABELS;
+  KTT.saveSession(DATA, LABELS, {source:file.name, page:location.pathname});
+  buildFilters();
+  const years=[...new Set(DATA.map(r=>r.TAHUN))].sort((a,b)=>a-b);
+  const latest = years.at(-1);
+  if(latest!=null) $('#filterYear').val(String(latest));
+  SELECTED_MONTH = null;
+  applyQueryDefaults();
+  applyFilters();
+}
+
+function init() {
+  const s = KTT.loadSession();
+  if(s.ok && s.DATA && s.DATA.length) {
+    DATA = s.DATA;
+    LABELS = s.LABELS || new Map();
+    buildFilters();
+    const years=[...new Set(DATA.map(r=>r.TAHUN))].sort((a,b)=>a-b);
+    const latest = years.at(-1);
+    if(latest!=null) $('#filterYear').val(String(latest));
+    applyQueryDefaults();
+    applyFilters();
+  } else {
+    setStatus('Belum ada data. Upload Excel di kanan atas.');
+  }
+
+  $('#filterUID,#filterYear,#filterIndustri').on('change', ()=> {
+    SELECTED_MONTH = null;
+    applyFilters();
+  });
+
+  $('#fileInput').on('change', async e=>{
+    const f = e.target.files[0];
+    if(!f) return;
+    try { await loadFromFile(f); }
+    catch(err) { alert(String(err)); console.error(err); }
+  });
+
+  $('#btnReset').on('click', ()=>{
+    $('#fileInput').val('');
+    DATA=[]; LABELS=new Map();
+    KTT.clearSession();
+    SELECTED_MONTH=null;
+    if(lineChart){ lineChart.destroy(); lineChart=null; }
+    if(pieChart){ pieChart.destroy(); pieChart=null; }
+    if(dtTop){ dtTop.destroy(); dtTop=null; }
+    setStatus('Reset OK. Upload lagi untuk mulai.');
+  });
+
+  $('#btnExport').on('click', exportTable);
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+
+</body>
+</html>
