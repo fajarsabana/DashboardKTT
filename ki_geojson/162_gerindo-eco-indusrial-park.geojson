@@ -1,0 +1,17 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "ki_shapes_with_color.fid--33218dc8_19bda1e3600_-7d80",
+      "geometry": null,
+      "geometry_name": "geom",
+      "properties": {
+        "id": 26,
+        "id_ki": 162,
+        "warna": null,
+        "nama_ki": "Gerindo Eco Indusrial Park"
+      }
+    }
+  ]
+}
