@@ -1,0 +1,137 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "ki_shapes_with_color.fid--33218dc8_19bda1e3600_-7b98",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                104.069,
+                1.1047,
+                0
+              ],
+              [
+                104.0689,
+                1.1117,
+                0
+              ],
+              [
+                104.0746,
+                1.1116,
+                0
+              ],
+              [
+                104.078,
+                1.1065,
+                0
+              ],
+              [
+                104.0762,
+                1.1053,
+                0
+              ],
+              [
+                104.0747,
+                1.1075,
+                0
+              ],
+              [
+                104.0733,
+                1.1067,
+                0
+              ],
+              [
+                104.0735,
+                1.1052,
+                0
+              ],
+              [
+                104.069,
+                1.1047,
+                0
+              ]
+            ]
+          ]
+        ]
+      },
+      "geometry_name": "geom",
+      "properties": {
+        "id": 526,
+        "id_ki": 5,
+        "warna": null,
+        "nama_ki": "Tunas Industrial Estate"
+      },
+      "bbox": [
+        104.0689,
+        1.1047,
+        104.078,
+        1.1117
+      ]
+    },
+    {
+      "type": "Feature",
+      "id": "ki_shapes_with_color.fid--33218dc8_19bda1e3600_-7b97",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                104.0684,
+                1.112,
+                0
+              ],
+              [
+                104.0678,
+                1.112,
+                0
+              ],
+              [
+                104.0657,
+                1.1129,
+                0
+              ],
+              [
+                104.0658,
+                1.1153,
+                0
+              ],
+              [
+                104.0673,
+                1.1153,
+                0
+              ],
+              [
+                104.0684,
+                1.1153,
+                0
+              ],
+              [
+                104.0684,
+                1.112,
+                0
+              ]
+            ]
+          ]
+        ]
+      },
+      "geometry_name": "geom",
+      "properties": {
+        "id": 527,
+        "id_ki": 5,
+        "warna": null,
+        "nama_ki": "Tunas Industrial Estate"
+      },
+      "bbox": [
+        104.0657,
+        1.112,
+        104.0684,
+        1.1153
+      ]
+    }
+  ]
+}
