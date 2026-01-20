@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>KTT Dashboard — Beban Puncak</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css" rel="stylesheet">
+<link href="https://cdn.datatables.net/v/bs5/dt-2.1.8/datatables.min.css" rel="stylesheet">
+
+<style>
+  body{background:#f3f3f4}
+  .sidebar{width:250px;background:#2f4050;color:#cfd8dc;position:fixed;height:100%;left:0;top:0}
+  .sidebar .brand{padding:18px 20px;font-weight:700;color:#fff;background:#293846}
+  .sidebar a{display:block;color:#cfd8dc;padding:10px 20px;text-decoration:none}
+  .sidebar a.active,.sidebar a:hover{background:#243342;color:#fff}
+  .content{margin-left:250px;padding:20px}
+  .ibox{background:#fff;border:1px solid #e7eaec;border-radius:8px;margin-bottom:16px;position:relative}
+  .ibox-title{padding:12px 16px;border-bottom:1px solid #e7eaec;font-weight:600;display:flex;align-items:center;gap:.5rem;position:relative}
+  .ibox-content{padding:16px;position:relative}
+  .kpi .val{font-size:1.8rem;font-weight:700}
+  .pill{font-size:.75rem;padding:.25rem .5rem;background:#eef2f6;border-radius:999px}
+  canvas { background: #fff; border-radius:6px; }
+  .hint{font-size:.85rem;color:#6c757d}
+  /* equal-height for KPI cards */
+  .equal-height > [class^="col"], .equal-height > [class*=" col"]{ display:flex; }
+  .equal-height .ibox{ width:100%; }
+  /* lock chart heights to avoid runaway resizing/scrolling issues */
+  .chart-wrap{ height:320px; position:relative; }
+  .chart-wrap canvas{ width:100% !important; height:100% !important; }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand"><i class="fa-solid fa-bolt me-2"></i>KTT Dashboard</div>
+  <a href="index.html" class=""><i class="fa-solid fa-gauge me-2"></i>Dashboard</a>
+  <a href="industri.html" class=""><i class="fa-solid fa-industry me-2"></i>Industri</a>
+  <a href="pelanggan.html" class=""><i class="fa-solid fa-users me-2"></i>Pelanggan</a>
+  <a href="bebanpuncak.html" class="active"><i class="fa-solid fa-chart-column me-2"></i>Beban Puncak</a>
+</aside>
+
+<main class="content">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h4 class="fw-semibold mb-0">Beban Puncak — Harian (MW)</h4>
+      <div class="hint">Sumber: Sheet <b>INPUT BP 1</b> (DMN/DMP/BP Sistem/BP KTT + detail KTT).</div>
+    </div>
+    <div class="d-flex gap-2">
+      <input id="fileInput" type="file" accept=".xlsx,.xls" class="form-control form-control-sm" style="width:320px">
+      <button id="btnReset" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-rotate"></i> Reset</button>
+    </div>
+  </div>
+
+  <div class="ibox">
+    <div class="ibox-title">Filter</div>
+    <div class="ibox-content">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label">Sistem</label>
+          <select id="filterSistem" class="form-select">
+            <option value="SULUTGO">Sulutgo</option>
+            <option value="SULBAGSEL">Sulbagsel</option>
+            <option value="INTERKONEKSI">Interkoneksi (Kalimantan)</option>
+            <option value="SUMATERA">Sumatera</option>
+            <option value="JAMALI">JAMALI Gabungan</option>
+          </select>
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">Mode</label>
+          <select id="filterMode" class="form-select">
+            <option value="MONTH" selected>Bulanan</option>
+            <option value="YEAR">Tahunan</option>
+          </select>
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">Tahun</label>
+          <select id="filterYear" class="form-select"></select>
+        </div>
+
+        <div class="col-md-2" id="colMonth">
+          <label class="form-label">Bulan</label>
+          <select id="filterMonth" class="form-select"></select>
+        </div>
+
+        
+</div>
+
+
+      <div class="row g-2 mt-2">
+        <div class="col-12">
+          <div class="d-flex justify-content-between">
+            <label class="form-label mb-1">Tampilkan seri</label>
+            <span id="periodInfo" class="pill">—</span>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="togDMN" checked>
+              <label class="form-check-label" for="togDMN">DMN</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="togDMP" checked>
+              <label class="form-check-label" for="togDMP">DMP</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="togBPS" checked>
+              <label class="form-check-label" for="togBPS">BP Sistem</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="togBPK" checked>
+              <label class="form-check-label" for="togBPK">BP KTT</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="togPrev" checked>
+              <label class="form-check-label" for="togPrev">BP Tahun Lalu</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hint mt-2">
+        Catatan: Mode <b>Bulanan</b> menampilkan tren <b>harian</b> dalam bulan terpilih. Mode <b>Tahunan</b> merangkum <b>puncak per bulan</b> dalam satu tahun.
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3 equal-height">
+    <div class="col-md-4 col-lg-2">
+      <div class="ibox">
+        <div class="ibox-title"><i class="fa-solid fa-bolt me-2 text-warning"></i>BP Sistem (Max)</div>
+        <div class="ibox-content kpi">
+          <div class="val" id="kpiBpSMax">-</div>
+          <div class="text-muted small" id="kpiBpSMaxDate">—</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 col-lg-2">
+      <div class="ibox">
+        <div class="ibox-title"><i class="fa-solid fa-wave-square me-2"></i>BP Sistem (Avg)</div>
+        <div class="ibox-content kpi">
+          <div class="val" id="kpiBpSAvg">-</div>
+          <div class="text-muted small">MW</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 col-lg-2">
+      <div class="ibox">
+        <div class="ibox-title"><i class="fa-solid fa-industry me-2"></i>BP KTT (Max)</div>
+        <div class="ibox-content kpi">
+          <div class="val" id="kpiBpKMax">-</div>
+          <div class="text-muted small" id="kpiBpKMaxDate">—</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <div class="ibox">
+        <div class="ibox-title"><i class="fa-solid fa-percent me-2"></i>Kontribusi KTT (Avg)</div>
+        <div class="ibox-content kpi">
+          <div class="val" id="kpiKttShare">-</div>
+          <div class="text-muted small">BP KTT / BP Sistem</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <div class="ibox">
+        <div class="ibox-title"><i class="fa-solid fa-shield-halved me-2"></i>Cadangan (Avg)</div>
+        <div class="ibox-content kpi">
+          <div class="val" id="kpiReserve">-</div>
+          <div class="text-muted small">(DMN - BP Sistem) rata-rata</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="ibox">
+        <div class="ibox-title d-flex justify-content-between align-items-center">
+          <span><i class="fa-solid fa-chart-line me-2"></i>Grafik Bulanan (Model Excel)</span>
+          <div class="text-muted small">Stacked bar BP + line DMN/DMP + BP tahun lalu.</div>
+        </div>
+        <div class="ibox-content">
+          <div class="chart-wrap">
+            <canvas id="comboBP"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="ibox">
+        <div class="ibox-title d-flex justify-content-between align-items-center">
+          <span><i class="fa-solid fa-ranking-star me-2"></i>Top KTT (Max, MW)</span>
+          <button class="btn btn-outline-success btn-sm" id="btnExportTop"><i class="fa-solid fa-file-excel"></i> Export</button>
+        </div>
+        <div class="ibox-content">
+          <div class="chart-wrap">
+            <canvas id="barTopKtt"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ibox">
+    <div class="ibox-title d-flex justify-content-between align-items-center">
+      <span>Detail Top KTT</span>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary btn-sm" id="btnExportAll"><i class="fa-solid fa-download"></i> CSV (Data Bulan)</button>
+      </div>
+    </div>
+    <div class="ibox-content">
+      <table id="tblTop" class="table table-striped" style="width:100%">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>KTT</th>
+            <th>Max (MW)</th>
+            <th>Tgl Max</th>
+            <th>Avg (MW)</th>
+            <th>Last (MW)</th>
+            <th>Share Avg vs BP KTT (%)</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="text-muted small mt-2">Catatan: Share dihitung terhadap <b>BP KTT</b> sistem terpilih pada bulan terpilih.</div>
+    </div>
+  </div>
+
+  <div class="text-center text-muted py-3">© 2025 KTT Dashboard — Beban Puncak</div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/v/bs5/dt-2.1.8/datatables.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<script>
+/* =========================
+   Beban Puncak (UNIFIED)
+   - INPUT BP 1: Sistem Sulutgo/Sulbagsel/Interkoneksi/Sumatera (DMN/DMP/BP Sistem/BP KTT + detail KTT terstruktur)
+   - INPUT BP 2: JAMALI Gabungan (DMN/DMP/BP Sistem + BP KTT JAMALI = SUM kolom F-J + detail KTT kolom K..dst)
+   Penyimpanan:
+   - BP1 disimpan penuh di localStorage (kecil)
+   - BP2 disimpan ringkasan di localStorage + detail di IndexedDB (agar tidak kena quota)
+========================= */
+
+(function(){
+  const nf0 = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 });
+  const nf2 = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 });
+
+  const LS_BP1_DATA = 'KTT_BP1_DATA';
+  const LS_BP1_META = 'KTT_BP1_META';
+  const LS_BP2_SUM  = 'KTT_BP2_SUMMARY';
+  const LS_BP2_META = 'KTT_BP2_META';
+
+  const IDB_NAME = 'KTT_DASHBOARD_DB';
+  const IDB_VER  = 1;
+  const IDB_STORE = 'kv';
+  const IDB_KEY_BP2_DETAIL = 'BP2_DETAIL_ROWS';
+
+  const MONTHS = [
+    {v:1, label:'Januari'},
+    {v:2, label:'Februari'},
+    {v:3, label:'Maret'},
+    {v:4, label:'April'},
+    {v:5, label:'Mei'},
+    {v:6, label:'Juni'},
+    {v:7, label:'Juli'},
+    {v:8, label:'Agustus'},
+    {v:9, label:'September'},
+    {v:10,label:'Oktober'},
+    {v:11,label:'November'},
+    {v:12,label:'Desember'},
+  ];
+
+  const SYSTEMS = {
+    SULUTGO: { label:'Sulutgo', source:'BP1', dmn:'DMN_SULUTGO', dmp:'DMP_SULUTGO', bps:'BP_SYS_SULUTGO', bpk:'BP_KTT_SULUTGO' },
+    SULBAGSEL: { label:'Sulbagsel', source:'BP1', dmn:'DMN_SULBAGSEL', dmp:'DMP_SULBAGSEL', bps:'BP_SYS_SULBAGSEL', bpk:'BP_KTT_SULBAGSEL' },
+    INTERKONEKSI: { label:'Interkoneksi (Kalimantan)', source:'BP1', dmn:'DMN_INTERKONEKSI', dmp:'DMP_INTERKONEKSI', bps:'BP_SYS_INTERKONEKSI', bpk:'BP_KTT_INTERKONEKSI' },
+    SUMATERA: { label:'Sumatera', source:'BP1', dmn:'DMN_SUMATERA', dmp:'DMP_SUMATERA', bps:'BP_SYS_SUMATERA', bpk:'BP_KTT_SUMATERA' },
+    JAMALI: { label:'JAMALI Gabungan', source:'BP2', dmn:'DMN', dmp:'DMP', bps:'BP_SYS', bpk:'BP_KTT_JAMALI' }
+  };
+
+  const CUSTOMER_GROUPS_BP1 = {
+    SULBAGSEL: [
+      { key:'HUADI_40', label:'HUADI (40)' },
+      { key:'HUADI_YATAI_150', label:'H YATAI (150)' },
+      { key:'HUADI_WUZHOU_90', label:'H WUZHOU (90)' },
+      { key:'HUADI_HENGSENG_30', label:'HENGSENG (30)' },
+      { key:'HUADI_UNITY_80', label:'UNITY (80)' },
+      { key:'SEMEN_BOSOWA', label:'PT SEMEN BOSOWA' },
+      { key:'SEMEN_TONASA', label:'PT SEMEN TONASA' },
+      { key:'ANTAM_POMALAA', label:'PT ANEKA TAMBANG POMALAA' },
+      { key:'CERIA_NUGRAHA', label:'PT CERIA NUGRAHA INDOTAMA' }
+    ],
+    INTERKONEKSI: [
+      { key:'ITP', label:'PT ITP' },
+      { key:'SILO', label:'PT SILO' },
+      { key:'KFI', label:'PT KFI' },
+      { key:'KOBEX', label:'PT KOBEX' },
+      { key:'MMP', label:'PT MMP' }
+    ],
+    SULUTGO: [
+      { key:'ANTAM_HALMAHERA', label:'PT ANTAM HALMAHERA TIMUR' },
+      { key:'BIOMASA', label:'PT BIOMASA JAYA ABADI' },
+      { key:'MEARES', label:'PT MEARES SOPUTAN MINING' },
+      { key:'GSM', label:'PT GSM' }
+    ],
+    SUMATERA: [
+      { key:'AGINCOURT', label:'PT AGINCOURT RESOURCES' },
+      { key:'GROWTH_SUMATERA', label:'PT GROWTH SUMATERA' },
+      { key:'WILMAR', label:'PT WILMAR NABATI INDONESIA' },
+      { key:'PHR', label:'PT PERTAMINA HULU ROKAN' },
+      { key:'SEMEN_PADANG', label:'PT SEMEN PADANG' },
+      { key:'SEMEN_PADANG_VI', label:'PT SEMEN PADANG UNIT VI' },
+      { key:'SEMEN_BATURAJA', label:'PT SEMEN BATURAJA TBK II' }
+    ]
+  };
+
+  // ========= utils =========
+  function norm(s){ return String(s ?? '').trim().toUpperCase(); }
+
+  function toNumber(v){
+    if (v == null || v === '') return null;
+    if (typeof v === 'number') return isFinite(v) ? v : null;
+    const s = String(v)
+      .replace(/\s/g,'')
+      .replace(/\./g,'')
+      .replace(/,/g,'.')
+      .replace(/[^0-9eE.+\-]/g,'');
+    const n = parseFloat(s);
+    return isFinite(n) ? n : null;
+  }
+
+  function toISODate(d){
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function parseDateCell(v){
+    if (v == null || v === '') return null;
+    if (typeof v === 'number' && isFinite(v)) {
+      const ms = Math.round((v - 25569) * 86400 * 1000);
+      const d = new Date(ms);
+      if (!isNaN(d.getTime())) return d;
+    }
+    if (v instanceof Date && !isNaN(v.getTime())) return v;
+
+    const s = String(v).trim();
+    const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+    if (m) {
+      const dd = parseInt(m[1],10);
+      const mm = parseInt(m[2],10);
+      let yy = parseInt(m[3],10);
+      if (yy < 100) yy += 2000;
+      const d = new Date(yy, mm-1, dd);
+      if (!isNaN(d.getTime())) return d;
+    }
+    const d2 = new Date(s);
+    if (!isNaN(d2.getTime())) return d2;
+    return null;
+  }
+
+  function daysInMonth(year, month){
+    return new Date(year, month, 0).getDate(); // month: 1-12
+  }
+
+  function fmtShortDate(day, month, year){
+    return `${day}/${month}/${year}`;
+  }
+
+  function safeVal(v){
+    return (v==null || !isFinite(v)) ? null : v;
+  }
+
+  function avg(arr){
+    const xs = arr.filter(v => v!=null && isFinite(v));
+    if (!xs.length) return null;
+    return xs.reduce((a,b)=>a+b,0)/xs.length;
+  }
+
+  function maxWithDate(rows, key){
+    let best = { v:null, d:null };
+    for (const r of rows){
+      const v = r[key];
+      if (v==null || !isFinite(v)) continue;
+      if (best.v==null || v > best.v){
+        best = { v, d:r.TGL };
+      }
+    }
+    return best;
+  }
+
+  function slugKey(label, idx, used){
+    const base = String(label ?? '').trim() || `COL_${idx+1}`;
+    let key = base
+      .toUpperCase()
+      .replace(/["']/g,'')
+      .replace(/[^A-Z0-9]+/g,'_')
+      .replace(/^_+|_+$/g,'')
+      .replace(/_+/g,'_');
+
+    if (!key) key = `COL_${idx+1}`;
+    if (/^\d/.test(key)) key = `C_${key}`;
+
+    let k = key;
+    let n = 2;
+    while (used.has(k)) k = `${key}_${n++}`;
+    used.add(k);
+    return k;
+  }
+
+  // ========= IndexedDB =========
+  function openDB(){
+    return new Promise((resolve, reject)=>{
+      const req = indexedDB.open(IDB_NAME, IDB_VER);
+      req.onupgradeneeded = (e)=>{
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(IDB_STORE)){
+          db.createObjectStore(IDB_STORE, { keyPath:'id' });
+        }
+      };
+      req.onsuccess = ()=> resolve(req.result);
+      req.onerror = ()=> reject(req.error);
+    });
+  }
+
+  async function idbSet(id, value){
+    const db = await openDB();
+    return new Promise((resolve, reject)=>{
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put({ id, value });
+      tx.oncomplete = ()=> resolve(true);
+      tx.onerror = ()=> reject(tx.error);
+    });
+  }
+
+  async function idbGet(id){
+    const db = await openDB();
+    return new Promise((resolve, reject)=>{
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const req = tx.objectStore(IDB_STORE).get(id);
+      req.onsuccess = ()=> resolve(req.result ? req.result.value : null);
+      req.onerror = ()=> reject(req.error);
+    });
+  }
+
+  async function idbDel(id){
+    const db = await openDB();
+    return new Promise((resolve, reject)=>{
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).delete(id);
+      tx.oncomplete = ()=> resolve(true);
+      tx.onerror = ()=> reject(tx.error);
+    });
+  }
+
+  // ========= Parsers =========
+  function parseBP1FromWB(wb){
+    const shName = wb.SheetNames.find(n => String(n).toLowerCase().trim() === 'input bp 1') ||
+                   wb.SheetNames.find(n => /input\s*bp\s*1/i.test(n));
+    if (!shName) return { out: null, meta: null };
+
+    const ws = wb.Sheets[shName];
+    const raw = XLSX.utils.sheet_to_json(ws, { header:1, defval:null, raw:true });
+
+    const out = [];
+    for (let r=2; r<raw.length; r++){
+      const row = raw[r];
+      if (!row) continue;
+      const d = parseDateCell(row[0]);
+      if (!d) continue;
+
+      out.push({
+        TGL: toISODate(d),
+        TAHUN: d.getFullYear(),
+        BULAN: d.getMonth()+1,
+        HARI: d.getDate(),
+
+        // DMN (B-E)
+        DMN_SULUTGO: toNumber(row[1]),
+        DMN_SULBAGSEL: toNumber(row[2]),
+        DMN_INTERKONEKSI: toNumber(row[3]),
+        DMN_SUMATERA: toNumber(row[4]),
+
+        // DMP (F-I)
+        DMP_SULUTGO: toNumber(row[5]),
+        DMP_SULBAGSEL: toNumber(row[6]),
+        DMP_INTERKONEKSI: toNumber(row[7]),
+        DMP_SUMATERA: toNumber(row[8]),
+
+        // BP Sistem (J-M)
+        BP_SYS_SULUTGO: toNumber(row[9]),
+        BP_SYS_SULBAGSEL: toNumber(row[10]),
+        BP_SYS_INTERKONEKSI: toNumber(row[11]),
+        BP_SYS_SUMATERA: toNumber(row[12]),
+
+        // BP KTT (N-Q)
+        BP_KTT_SULUTGO: toNumber(row[13]),
+        BP_KTT_SULBAGSEL: toNumber(row[14]),
+        BP_KTT_INTERKONEKSI: toNumber(row[15]),
+        BP_KTT_SUMATERA: toNumber(row[16]),
+
+        // Detail KTT (R-AP)
+        HUADI_40: toNumber(row[17]),
+        HUADI_YATAI_150: toNumber(row[18]),
+        HUADI_WUZHOU_90: toNumber(row[19]),
+        HUADI_HENGSENG_30: toNumber(row[20]),
+        HUADI_UNITY_80: toNumber(row[21]),
+        SEMEN_BOSOWA: toNumber(row[22]),
+        SEMEN_TONASA: toNumber(row[23]),
+        ANTAM_POMALAA: toNumber(row[24]),
+        CERIA_NUGRAHA: toNumber(row[25]),
+        ITP: toNumber(row[26]),
+        SILO: toNumber(row[27]),
+        KFI: toNumber(row[28]),
+        KOBEX: toNumber(row[29]),
+        MMP: toNumber(row[30]),
+        ANTAM_HALMAHERA: toNumber(row[31]),
+        BIOMASA: toNumber(row[32]),
+        MEARES: toNumber(row[33]),
+        GSM: toNumber(row[34]),
+        AGINCOURT: toNumber(row[35]),
+        GROWTH_SUMATERA: toNumber(row[36]),
+        WILMAR: toNumber(row[37]),
+        PHR: toNumber(row[38]),
+        SEMEN_PADANG: toNumber(row[39]),
+        SEMEN_PADANG_VI: toNumber(row[40]),
+        SEMEN_BATURAJA: toNumber(row[41]),
+      });
+    }
+
+    out.sort((a,b)=> a.TGL.localeCompare(b.TGL));
+    const meta = {
+      sheet: shName,
+      rows: out.length,
+      minDate: out[0]?.TGL || null,
+      maxDate: out[out.length-1]?.TGL || null,
+      updatedAt: new Date().toISOString()
+    };
+    return { out, meta };
+  }
+
+  function parseBP2FromWB(wb){
+    const shName = wb.SheetNames.find(n => String(n).toLowerCase().trim() === 'input bp 2') ||
+                   wb.SheetNames.find(n => /input\s*bp\s*2/i.test(n));
+    if (!shName) return { outDetail: null, outSummary: null, meta: null };
+
+    const ws = wb.Sheets[shName];
+    const raw = XLSX.utils.sheet_to_json(ws, { header:1, defval:null, raw:true });
+
+    let hdr = raw.findIndex(r => norm(r && r[0]) === 'TANGGAL');
+    if (hdr < 0) hdr = 0;
+
+    const headerRow = raw[hdr] || [];
+    const used = new Set(['TGL','TAHUN','BULAN','HARI','DMN','DMP','BP_SYS','BP_KTT','REG_BANTEN','REG_JAWA_TIMUR','REG_JAYA','REG_JAWA_BARAT','REG_JAWA_TENGAH','BP_KTT_JAMALI']);
+    const customers = [];
+    for (let c=10; c<headerRow.length; c++){
+      const label = String(headerRow[c] ?? '').trim();
+      if (!label) continue;
+      const key = slugKey(label, c, used);
+      customers.push({ key, label, col: c });
+    }
+
+    const detail = [];
+    const summary = [];
+    for (let r=hdr+1; r<raw.length; r++){
+      const row = raw[r] || [];
+      const d = parseDateCell(row[0]);
+      if (!d) continue;
+
+      const regB = toNumber(row[5]);
+      const regJT = toNumber(row[6]);
+      const regJY = toNumber(row[7]);
+      const regJB = toNumber(row[8]);
+      const regJG = toNumber(row[9]);
+      const jamali = safeVal((regB||0) + (regJT||0) + (regJY||0) + (regJB||0) + (regJG||0));
+
+      const base = {
+        TGL: toISODate(d),
+        TAHUN: d.getFullYear(),
+        BULAN: d.getMonth()+1,
+        HARI: d.getDate(),
+
+        DMN: toNumber(row[1]),
+        DMP: toNumber(row[2]),
+        BP_SYS: toNumber(row[3]),
+        BP_KTT: toNumber(row[4]),
+
+        REG_BANTEN: regB,
+        REG_JAWA_TIMUR: regJT,
+        REG_JAYA: regJY,
+        REG_JAWA_BARAT: regJB,
+        REG_JAWA_TENGAH: regJG,
+
+        BP_KTT_JAMALI: jamali,
+      };
+
+      // summary row (tanpa kolom pelanggan)
+      summary.push({ ...base });
+
+      // detail row (dengan kolom pelanggan)
+      const det = { ...base };
+      for (const c of customers){
+        det[c.key] = toNumber(row[c.col]);
+      }
+      detail.push(det);
+    }
+
+    summary.sort((a,b)=> a.TGL.localeCompare(b.TGL));
+    detail.sort((a,b)=> a.TGL.localeCompare(b.TGL));
+
+    const meta = {
+      sheet: shName,
+      rows: summary.length,
+      minDate: summary[0]?.TGL || null,
+      maxDate: summary[summary.length-1]?.TGL || null,
+      customers: customers.map(({key,label})=>({key,label})),
+      updatedAt: new Date().toISOString()
+    };
+
+    return { outDetail: detail, outSummary: summary, meta };
+  }
+
+  async function parseWorkbook(file){
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type:'array', cellDates:true });
+
+    const bp1 = parseBP1FromWB(wb);
+    const bp2 = parseBP2FromWB(wb);
+
+    return {
+      BP1: bp1.out, BP1_meta: bp1.meta,
+      BP2_detail: bp2.outDetail, BP2_sum: bp2.outSummary, BP2_meta: bp2.meta
+    };
+  }
+
+  // ========= Store =========
+  function saveBP1(data, meta){
+    localStorage.setItem(LS_BP1_DATA, JSON.stringify(data || []));
+    localStorage.setItem(LS_BP1_META, JSON.stringify(meta || {}));
+  }
+  function saveBP2Summary(sum, meta){
+    localStorage.setItem(LS_BP2_SUM, JSON.stringify(sum || []));
+    localStorage.setItem(LS_BP2_META, JSON.stringify(meta || {}));
+  }
+  function loadBP1(){
+    try{
+      return {
+        data: JSON.parse(localStorage.getItem(LS_BP1_DATA) || '[]'),
+        meta: JSON.parse(localStorage.getItem(LS_BP1_META) || '{}')
+      };
+    }catch(e){ return { data:[], meta:{} }; }
+  }
+  function loadBP2Summary(){
+    try{
+      return {
+        data: JSON.parse(localStorage.getItem(LS_BP2_SUM) || '[]'),
+        meta: JSON.parse(localStorage.getItem(LS_BP2_META) || '{}')
+      };
+    }catch(e){ return { data:[], meta:{} }; }
+  }
+  async function saveBP2DetailToIDB(detail){
+    // detail bisa besar -> IndexedDB
+    await idbSet(IDB_KEY_BP2_DETAIL, detail || []);
+  }
+  async function loadBP2DetailFromIDB(){
+    const v = await idbGet(IDB_KEY_BP2_DETAIL);
+    return Array.isArray(v) ? v : [];
+  }
+
+  async function clearAllStores(){
+    localStorage.removeItem(LS_BP1_DATA);
+    localStorage.removeItem(LS_BP1_META);
+    localStorage.removeItem(LS_BP2_SUM);
+    localStorage.removeItem(LS_BP2_META);
+    await idbDel(IDB_KEY_BP2_DETAIL);
+  }
+
+  // ========= UI helpers =========
+  function downloadCSV(filename, rows){
+    const cols = Object.keys(rows[0] || {});
+    const esc = (s)=> `"${String(s??'').replace(/"/g,'""')}"`;
+    const lines = [];
+    lines.push(cols.map(esc).join(','));
+    for (const r of rows){
+      lines.push(cols.map(c=>esc(r[c])).join(','));
+    }
+    const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadTopCSV(filename, list){
+    const cols = ['KTT','MAX_MW','TGL_MAX','AVG_MW','LAST_MW','SHARE_AVG_PCT'];
+    const esc = (s)=> `"${String(s??'').replace(/"/g,'""')}"`;
+    const lines = [cols.map(esc).join(',')];
+    for (const r of list){
+      lines.push(cols.map(c=>esc(r[c])).join(','));
+    }
+    const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  // ========= Render =========
+  let comboChart = null;
+  let barChart = null;
+  let dt = null;
+  let filtersBuiltForDataset = null;
+
+  // BP2 detail cache
+  let BP2_DETAIL_CACHE = null;
+
+  function clearChartsAndTables(){
+    if (comboChart){ comboChart.destroy(); comboChart=null; }
+    if (barChart){ barChart.destroy(); barChart=null; }
+    if (dt){ dt.destroy(); dt=null; }
+    const tbody = document.querySelector('#tblTop tbody');
+    if (tbody) tbody.innerHTML = '';
+  }
+
+  function getDatasetForSystem(sysKey){
+    const sys = SYSTEMS[sysKey] || SYSTEMS.SULUTGO;
+    if (sys.source === 'BP2'){
+      // gunakan detail cache kalau ada, kalau tidak pakai summary (chart/kpi masih jalan tapi Top KTT bisa kosong)
+      const s = loadBP2Summary();
+      const detail = Array.isArray(BP2_DETAIL_CACHE) ? BP2_DETAIL_CACHE : null;
+      return { sys, data: detail || s.data, meta: s.meta, hasDetail: !!detail, summaryData: s.data };
+    } else {
+      const s = loadBP1();
+      return { sys, data: s.data, meta: s.meta, hasDetail: true, summaryData: s.data };
+    }
+  }
+
+  function buildFiltersByData(data, meta){
+    const years = Array.from(new Set((data||[]).map(r=>r.TAHUN).filter(Boolean))).sort((a,b)=>a-b);
+    const yearSel = document.getElementById('filterYear');
+    yearSel.innerHTML = years.map(y=>`<option value="${y}">${y}</option>`).join('');
+
+    const monthSel = document.getElementById('filterMonth');
+    monthSel.innerHTML = MONTHS.map(m=>`<option value="${m.v}">${m.label}</option>`).join('');
+
+    // Default: otomatis ke "-1 bulan dari hari ini" (kalau tersedia di data).
+    // Fallback: gunakan meta.maxDate, lalu fallback terakhir ke record paling akhir.
+    let defYear = years[years.length-1] || new Date().getFullYear();
+    let defMonth = 1;
+
+    const d = new Date();
+    d.setDate(15); // stabil untuk perubahan bulan (hindari edge 31)
+    d.setMonth(d.getMonth() - 1);
+    const targetYear = d.getFullYear();
+    const targetMonth = d.getMonth() + 1;
+
+    const hasTarget = (data||[]).some(r => r && r.TAHUN === targetYear && r.BULAN === targetMonth);
+
+    if (years.includes(targetYear) && hasTarget){
+      defYear = targetYear;
+      defMonth = targetMonth;
+    } else if (meta && meta.maxDate){
+      const parts = String(meta.maxDate).split('-');
+      if (parts.length>=2){
+        const yy = parseInt(parts[0],10);
+        const mm = parseInt(parts[1],10);
+        if (years.includes(yy)) defYear = yy;
+        if (mm>=1 && mm<=12) defMonth = mm;
+      }
+    } else {
+      // fallback terakhir: ambil tanggal paling akhir dari data
+      const last = (data||[]).slice().sort((a,b)=> String(a.TGL||'').localeCompare(String(b.TGL||''))).pop();
+      if (last && last.TAHUN && last.BULAN){
+        defYear = last.TAHUN;
+        defMonth = last.BULAN;
+      }
+    }
+
+    yearSel.value = String(defYear);
+    monthSel.value = String(defMonth);
+  }
+
+  function render(){
+    const sysKey = document.getElementById('filterSistem')?.value || 'SULUTGO';
+    const pack = getDatasetForSystem(sysKey);
+    const { sys, data, meta, hasDetail, summaryData } = pack;
+
+    // hint header
+    const hint = document.getElementById('sheetNameHint');
+    if (hint){
+      hint.textContent = (sys.source === 'BP2') ? 'INPUT BP 1 + INPUT BP 2 (JAMALI)' : 'INPUT BP 1';
+    }
+
+    // dataset key to rebuild year/month options when switching systems
+    const datasetKey = sys.source;
+    const baseForFilters = (sys.source === 'BP2') ? (summaryData || data) : data;
+
+    if (!baseForFilters || !baseForFilters.length){
+      document.getElementById('periodInfo').textContent = 'Upload Excel';
+
+      ['kpiBpSMax','kpiBpSAvg','kpiBpKMax','kpiKttShare','kpiReserve'].forEach(id=>{
+        const el = document.getElementById(id); if (el) el.textContent='-';
+      });
+      const el1 = document.getElementById('kpiBpSMaxDate'); if (el1) el1.textContent='—';
+      const el2 = document.getElementById('kpiBpKMaxDate'); if (el2) el2.textContent='—';
+
+      clearChartsAndTables();
+      return;
+    }
+
+    if (filtersBuiltForDataset !== datasetKey){
+      buildFiltersByData(baseForFilters, meta);
+      filtersBuiltForDataset = datasetKey;
+    }
+
+    const mode = (document.getElementById('filterMode')?.value || 'MONTH').toUpperCase();
+    const colMonth = document.getElementById('colMonth');
+    if (colMonth) colMonth.style.display = (mode === 'YEAR') ? 'none' : '';
+
+    const year = parseInt(document.getElementById('filterYear').value,10);
+    const monthSel = document.getElementById('filterMonth');
+    let month = parseInt(monthSel?.value || '1',10);
+    const prevYear = year - 1;
+
+    const showDMN = document.getElementById('togDMN').checked;
+    const showDMP = document.getElementById('togDMP').checked;
+    const showBPS = document.getElementById('togBPS').checked;
+    const showBPK = document.getElementById('togBPK').checked;
+    const showPrev = document.getElementById('togPrev').checked;
+
+    let labels = [];
+    let curRows = [];
+    let prevRows = [];
+    let arrDMN = [];
+    let arrDMP = [];
+    let arrBPK = [];
+    let arrNonKtt = [];
+    let arrPrevBps = [];
+    let titleText = '';
+    let xTickRot = 0;
+
+    // gunakan baseForFilters untuk timeline (agar Jamali tetap jalan walau detail tidak ada)
+    const timelineData = baseForFilters;
+
+    if (mode === 'YEAR'){
+      labels = MONTHS.map(m=>m.label);
+      curRows = timelineData.filter(r => r.TAHUN === year).sort((a,b)=>a.TGL.localeCompare(b.TGL));
+      prevRows = timelineData.filter(r => r.TAHUN === prevYear).sort((a,b)=>a.TGL.localeCompare(b.TGL));
+
+      for (const m of MONTHS){
+        const mRows = curRows.filter(r => r.BULAN === m.v);
+        const mPrev = prevRows.filter(r => r.BULAN === m.v);
+
+        const peak = maxWithDate(mRows, sys.bps);
+        let bpsPeak = peak.v;
+        let bpkOnPeak = null;
+        if (peak.d){
+          const rowPeak = mRows.find(r => r.TGL === peak.d);
+          bpkOnPeak = rowPeak ? rowPeak[sys.bpk] : null;
+        }
+
+        const nonKtt = (bpsPeak!=null && bpkOnPeak!=null) ? (bpsPeak - bpkOnPeak) : null;
+
+        arrNonKtt.push(safeVal(nonKtt));
+        arrBPK.push(safeVal(bpkOnPeak));
+        arrDMN.push(avg(mRows.map(r => r[sys.dmn])));
+        arrDMP.push(avg(mRows.map(r => r[sys.dmp])));
+
+        const peakPrev = maxWithDate(mPrev, sys.bps);
+        arrPrevBps.push(safeVal(peakPrev.v));
+      }
+
+      document.getElementById('periodInfo').textContent = `${year} • ${curRows.length} hari`;
+      titleText = `Beban Puncak Sistem dan KTT ${sys.label} tahun ${year}`;
+      xTickRot = 0;
+
+      const btnAll = document.getElementById('btnExportAll');
+      if (btnAll) btnAll.innerHTML = '<i class="fa-solid fa-download"></i> CSV (Data Tahun)';
+    } else {
+      const monthLabel = (MONTHS.find(m=>m.v===month)||{label:`Bulan ${month}`}).label;
+
+      curRows = timelineData.filter(r => r.TAHUN === year && r.BULAN === month).sort((a,b)=>a.HARI-b.HARI);
+      prevRows = timelineData.filter(r => r.TAHUN === prevYear && r.BULAN === month).sort((a,b)=>a.HARI-b.HARI);
+
+      const dim = daysInMonth(year, month);
+      const labelDays = Array.from({length: dim}, (_,i)=> i+1);
+      labels = labelDays.map(d => fmtShortDate(d, month, year));
+
+      const curByDay = new Map(curRows.map(r => [r.HARI, r]));
+      const prevByDay = new Map(prevRows.map(r => [r.HARI, r]));
+
+      arrDMN = labelDays.map(d => safeVal(curByDay.get(d)?.[sys.dmn]));
+      arrDMP = labelDays.map(d => safeVal(curByDay.get(d)?.[sys.dmp]));
+      const arrBpsTotal = labelDays.map(d => safeVal(curByDay.get(d)?.[sys.bps]));
+      arrBPK = labelDays.map(d => safeVal(curByDay.get(d)?.[sys.bpk]));
+      arrNonKtt = labelDays.map(d => {
+        const bps = curByDay.get(d)?.[sys.bps];
+        const bpk = curByDay.get(d)?.[sys.bpk];
+        if (bps==null || bpk==null) return null;
+        const x = bps - bpk;
+        return safeVal(x < 0 ? null : x);
+      });
+      arrPrevBps = labelDays.map(d => safeVal(prevByDay.get(d)?.[sys.bps]));
+
+      document.getElementById('periodInfo').textContent =
+        `${monthLabel} ${year} • ${curRows.length}/${dim} hari`;
+
+      titleText = `Beban Puncak Sistem dan KTT ${sys.label} bulan ${monthLabel}`;
+      xTickRot = 45;
+
+      const btnAll = document.getElementById('btnExportAll');
+      if (btnAll) btnAll.innerHTML = '<i class="fa-solid fa-download"></i> CSV (Data Bulan)';
+    }
+
+    // KPIs
+    const maxBps = maxWithDate(curRows, sys.bps);
+    const maxBpk = maxWithDate(curRows, sys.bpk);
+
+    document.getElementById('kpiBpSMax').textContent = (maxBps.v==null) ? '-' : nf0.format(maxBps.v);
+    document.getElementById('kpiBpSMaxDate').textContent = (maxBps.d==null) ? '—' : maxBps.d;
+
+    const bpsAvg = avg(curRows.map(r => r[sys.bps]));
+    document.getElementById('kpiBpSAvg').textContent = (bpsAvg==null) ? '-' : nf2.format(bpsAvg);
+
+    document.getElementById('kpiBpKMax').textContent = (maxBpk.v==null) ? '-' : nf0.format(maxBpk.v);
+    document.getElementById('kpiBpKMaxDate').textContent = (maxBpk.d==null) ? '—' : maxBpk.d;
+
+    const bpkAvg = avg(curRows.map(r => r[sys.bpk]));
+    const shareAvg = (bpkAvg!=null && bpsAvg!=null && bpsAvg>0) ? (bpkAvg/bpsAvg*100) : null;
+    document.getElementById('kpiKttShare').textContent = (shareAvg==null) ? '-' : `${nf2.format(shareAvg)}%`;
+
+    const reserveAvg = avg(curRows.map(r => {
+      const dmn = r[sys.dmn]; const bps = r[sys.bps];
+      if (dmn==null || bps==null) return null;
+      return dmn - bps;
+    }));
+    document.getElementById('kpiReserve').textContent = (reserveAvg==null) ? '-' : nf2.format(reserveAvg);
+
+    // Combo chart
+    const datasets = [];
+    if (showBPK){
+      datasets.push({ type:'bar', label:'BP KTT', data: arrBPK, stack:'bp', order:2 });
+    }
+    if (showBPS){
+      datasets.push({ type:'bar', label:'BP Sistem', data: arrNonKtt, stack:'bp', order:2 });
+    }
+    if (showDMP){
+      datasets.push({
+        type:'line',
+        label:'DMP',
+        data: arrDMP,
+        tension:0.25,
+        pointRadius:0,
+        borderWidth:2,
+        order:1
+      });
+    }
+    if (showDMN){
+      datasets.push({ type:'line', label:'DMN', data: arrDMN, tension:0.25, pointRadius:0, borderWidth:2, order:1 });
+    }
+    if (showPrev){
+      datasets.push({ type:'line', label:`BP ${prevYear}`, data: arrPrevBps, tension:0.25, pointRadius:0, borderWidth:2, order:1 });
+    }
+
+    const ctx = document.getElementById('comboBP').getContext('2d');
+    if (comboChart) comboChart.destroy();
+    comboChart = new Chart(ctx, {
+      type:'bar',
+      data:{ labels, datasets },
+      options:{
+        responsive:true,
+        maintainAspectRatio:false,
+        layout:{ padding:{ left:12, right:12, top:8, bottom:0 } },
+        interaction:{ mode:'index', intersect:false },
+        plugins:{ legend:{ position:'bottom' }, title:{ display:true, text: titleText } },
+        scales:{
+          x:{ stacked:true, ticks:{ maxRotation:xTickRot, minRotation:xTickRot } },
+          y:{ stacked:true, beginAtZero:true, ticks:{ callback:(v)=>nf0.format(v) } }
+        }
+      }
+    });
+
+    // ===== Top KTT =====
+    // Untuk Top KTT butuh "data detail" (BP1 detail selalu ada; BP2 butuh detail cache / IDB)
+    let detailRowsForTop = null;
+    if (sys.source === 'BP2'){
+      detailRowsForTop = hasDetail ? data : null;
+    } else {
+      detailRowsForTop = timelineData; // BP1
+    }
+
+    let custList = [];
+    if (sysKey === 'JAMALI'){
+      const metaCustomers = (meta && Array.isArray(meta.customers)) ? meta.customers : [];
+      custList = metaCustomers.map(c => ({ key:c.key, label:c.label }));
+    } else {
+      custList = (CUSTOMER_GROUPS_BP1[sysKey] || []).map(x => ({...x}));
+    }
+
+    // filter periode untuk top berdasarkan detailRowsForTop
+    let topPeriodRows = [];
+    if (detailRowsForTop){
+      if (mode === 'YEAR'){
+        topPeriodRows = detailRowsForTop.filter(r => r.TAHUN === year).sort((a,b)=>a.TGL.localeCompare(b.TGL));
+      } else {
+        topPeriodRows = detailRowsForTop.filter(r => r.TAHUN === year && r.BULAN === month).sort((a,b)=>a.HARI-b.HARI);
+      }
+    }
+
+    const top = custList.map(c => {
+      const mx = maxWithDate(topPeriodRows, c.key);
+      const av = avg(topPeriodRows.map(r=>r[c.key]));
+      const last = topPeriodRows.length ? topPeriodRows[topPeriodRows.length-1][c.key] : null;
+      const share = (av!=null && bpkAvg!=null && bpkAvg>0) ? (av/bpkAvg*100) : null;
+      return {
+        KTT: c.label, key: c.key,
+        MAX_MW: mx.v, TGL_MAX: mx.d,
+        AVG_MW: av, LAST_MW: last,
+        SHARE_AVG_PCT: share
+      };
+    }).filter(r => r.MAX_MW!=null || r.AVG_MW!=null || r.LAST_MW!=null);
+
+    top.sort((a,b)=> (b.MAX_MW||-1) - (a.MAX_MW||-1));
+    const topN = top.slice(0, 10);
+
+    // bar chart top
+    const barCtx = document.getElementById('barTopKtt').getContext('2d');
+    if (barChart) barChart.destroy();
+    barChart = new Chart(barCtx, {
+      type:'bar',
+      data:{
+        labels: topN.map(r=>r.KTT),
+        datasets:[{ label:'Max (MW)', data: topN.map(r=>r.MAX_MW==null?0:r.MAX_MW) }]
+      },
+      options:{
+        responsive:true,
+        maintainAspectRatio:false,
+        plugins:{ legend:{ display:false } },
+        scales:{ y:{ ticks:{ callback:(v)=>nf0.format(v) } } }
+      }
+    });
+
+    // ===== Detail Top KTT (DataTable) =====
+// Pakai "data:" DataTables (bukan inject HTML) supaya tidak pernah kejadian tabel kosong padahal chart ada.
+const tableRows = top.map((r,i)=> ([
+  i+1,
+  r.KTT,
+  (r.MAX_MW==null ? null : r.MAX_MW),
+  (r.TGL_MAX || null),
+  (r.AVG_MW==null ? null : r.AVG_MW),
+  (r.LAST_MW==null ? null : r.LAST_MW),
+  (r.SHARE_AVG_PCT==null ? null : r.SHARE_AVG_PCT)
+]));
+
+const COLS = [
+  { title:'#' },
+  { title:'KTT' },
+  { title:'Max (MW)' },
+  { title:'Tgl Max' },
+  { title:'Avg (MW)' },
+  { title:'Last (MW)' },
+  { title:'Share Avg vs BP KTT (%)' }
+];
+
+if (!dt){
+  dt = $('#tblTop').DataTable({
+    data: tableRows,
+    columns: COLS,
+    pageLength: 10,
+    lengthMenu: [[10,25,50,-1],[10,25,50,'All']],
+    order: [[2,'desc']],
+    columnDefs: [
+      { targets: 0, width: "56px" },
+      {
+        targets: [2,4,5,6],
+        render: function(data, type){
+          // data = number|null
+          if (type === 'display'){
+            if (data==null || !isFinite(data)) return '-';
+            return nf2.format(data);
+          }
+          // sorting/filtering pakai angka mentah
+          return (data==null || !isFinite(data)) ? -1 : data;
+        }
+      },
+      {
+        targets: 3,
+        render: function(data, type){
+          if (type === 'display'){
+            return data ? data : '-';
+          }
+          return data ? data : '';
+        }
+      },
+      { targets: 1, render: function(data){ return data ?? '-'; } }
+    ],
+    destroy: true
+  });
+} else {
+  dt.clear();
+  dt.rows.add(tableRows);
+  dt.order([[2,'desc']]).draw();
+}// export
+    const mm = String(month).padStart(2,'0');
+    const prefix = (sys.source === 'BP2') ? 'BP2' : 'BP1';
+    document.getElementById('btnExportAll').onclick = () => {
+      if (mode === 'YEAR'){
+        downloadCSV(`${prefix}_${sysKey}_${year}.csv`, curRows);
+      } else {
+        downloadCSV(`${prefix}_${sysKey}_${year}-${mm}.csv`, curRows);
+      }
+    };
+    document.getElementById('btnExportTop').onclick = () => {
+      if (mode === 'YEAR'){
+        downloadTopCSV(`TopKTT_${prefix}_${sysKey}_${year}.csv`, top);
+      } else {
+        downloadTopCSV(`TopKTT_${prefix}_${sysKey}_${year}-${mm}.csv`, top);
+      }
+    };
+  }
+
+  // ========= Event wiring =========
+  document.getElementById('fileInput').addEventListener('change', async (ev)=>{
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    try{
+      const parsed = await parseWorkbook(f);
+
+      if (parsed.BP1 && parsed.BP1.length) saveBP1(parsed.BP1, parsed.BP1_meta);
+
+      // BP2
+      if (parsed.BP2_sum && parsed.BP2_sum.length){
+        saveBP2Summary(parsed.BP2_sum, parsed.BP2_meta);
+      }
+      if (parsed.BP2_detail && parsed.BP2_detail.length){
+        BP2_DETAIL_CACHE = parsed.BP2_detail;
+        // simpan ke IndexedDB biar Top KTT tidak hilang setelah refresh
+        try{ await saveBP2DetailToIDB(parsed.BP2_detail); }catch(e){ console.warn('IDB save fail', e); }
+      }
+
+      filtersBuiltForDataset = null;
+      render();
+    }catch(e){
+      alert(e.message || String(e));
+      console.error(e);
+    }
+  });
+
+  document.getElementById('btnReset').addEventListener('click', async ()=>{
+    if (confirm('Reset data Beban Puncak?')){
+      await clearAllStores();
+      BP2_DETAIL_CACHE = null;
+      document.getElementById('fileInput').value = '';
+      filtersBuiltForDataset = null;
+      render();
+    }
+  });
+
+  ['filterSistem','filterMode','filterYear','filterMonth','togDMN','togDMP','togBPS','togBPK','togPrev'].forEach(id=>{
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', ()=> render());
+  });
+
+  // init
+  (async function init(){
+    // tambah opsi JAMALI ke dropdown tanpa ubah layout template
+    const sel = document.getElementById('filterSistem');
+    if (sel && !Array.from(sel.options).some(o=>o.value==='JAMALI')){
+      const opt = document.createElement('option');
+      opt.value = 'JAMALI';
+      opt.textContent = 'JAMALI Gabungan';
+      sel.appendChild(opt);
+    }
+
+    // load BP2 detail from IDB (kalau ada)
+    try{
+      BP2_DETAIL_CACHE = await loadBP2DetailFromIDB();
+      if (BP2_DETAIL_CACHE && BP2_DETAIL_CACHE.length === 0) BP2_DETAIL_CACHE = null;
+    }catch(e){
+      BP2_DETAIL_CACHE = null;
+    }
+
+    filtersBuiltForDataset = null;
+    render();
+  })();
+
+})();
+</script>
+
+
+</body>
+</html>

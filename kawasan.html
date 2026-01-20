@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KTT Dashboard — Kawasan Industri</title>
+
+  <!-- Bootstrap & Font Awesome -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css" rel="stylesheet">
+
+  <!-- Leaflet -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+
+  <style>
+    body { background:#f3f3f4; margin:0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .sidebar {
+      width:250px;
+      background:#2f4050;
+      color:#cfd8dc;
+      position:fixed;
+      height:100%;
+      left:0;
+      top:0;
+    }
+    .sidebar .brand {
+      padding:18px 20px;
+      font-weight:700;
+      color:#fff;
+      background:#293846;
+    }
+    .sidebar a {
+      display:block;
+      color:#cfd8dc;
+      padding:10px 20px;
+      text-decoration:none;
+      font-size:0.92rem;
+    }
+    .sidebar a.active,.sidebar a:hover {
+      background:#243342;
+      color:#fff;
+    }
+    .content {
+      margin-left:250px;
+      padding:20px;
+    }
+    .ibox {
+      background:#fff;
+      border:1px solid #e7eaec;
+      border-radius:8px;
+      margin-bottom:16px;
+      position:relative;
+    }
+    .ibox-title {
+      padding:12px 16px;
+      border-bottom:1px solid #e7eaec;
+      font-weight:600;
+      display:flex;
+      align-items:center;
+      gap:.5rem;
+    }
+    .ibox-content {
+      padding:16px;
+    }
+    .pill {
+      font-size:.75rem;
+      padding:.25rem .5rem;
+      background:#eef2f6;
+      border-radius:999px;
+    }
+    .hint {
+      font-size:.85rem;
+      color:#6c757d;
+    }
+    #mapKI {
+      height:600px;
+      border-radius:8px;
+      border:1px solid #e7eaec;
+    }
+    .leaflet-container { font: inherit; }
+  </style>
+</head>
+<body>
+
+  <aside class="sidebar">
+    <div class="brand"><i class="fa-solid fa-bolt me-2"></i>KTT Dashboard</div>
+    <a href="index.html"><i class="fa-solid fa-gauge me-2"></i>Dashboard</a>
+    <a href="industri.html"><i class="fa-solid fa-industry me-2"></i>Industri</a>
+    <a href="pelanggan.html"><i class="fa-solid fa-users me-2"></i>Pelanggan</a>
+    <a href="bebanpuncak.html"><i class="fa-solid fa-chart-column me-2"></i>Beban Puncak</a>
+    <a href="kawasan.html" class="active"><i class="fa-solid fa-map-location-dot me-2"></i>Kawasan Industri</a>
+  </aside>
+
+  <main class="content">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h4 class="fw-semibold mb-0">Pemetaan Kawasan Industri</h4>
+        <div class="hint">
+          Sumber data: GeoJSON SPIN Kemenperin (folder <code>ki_geojson</code> sejajar dengan file ini).
+        </div>
+      </div>
+      <div class="pill" id="statusText">Menunggu pemuatan GeoJSON…</div>
+    </div>
+
+    <div class="ibox">
+      <div class="ibox-title">
+        <i class="fa-solid fa-filter me-2"></i>Filter Kawasan
+      </div>
+      <div class="ibox-content">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label">Kawasan Industri (nama_ki)</label>
+            <select id="filterKi" class="form-select">
+              <option value="ALL">Semua Kawasan</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Cari Kawasan</label>
+            <input type="text" id="searchKi" class="form-control" placeholder="Ketik nama kawasan...">
+          </div>
+          <div class="col-md-4 d-flex justify-content-end gap-2">
+            <button id="btnZoomAll" class="btn btn-outline-secondary btn-sm">
+              <i class="fa-solid fa-arrows-to-circle me-1"></i> Zoom ke Semua KI
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ibox">
+      <div class="ibox-title">
+        <i class="fa-solid fa-map me-2"></i>Peta Kawasan Industri
+      </div>
+      <div class="ibox-content">
+        <div id="mapKI"></div>
+      </div>
+    </div>
+
+    <div class="ibox">
+      <div class="ibox-title">
+        <i class="fa-solid fa-circle-info me-2"></i>Catatan
+      </div>
+      <div class="ibox-content">
+        <ul class="mb-0 hint">
+          <li>Folder <code>ki_geojson</code> harus berada di lokasi yang sama dengan file ini.</li>
+          <li>Daftar file GeoJSON diambil dari array <code>KAWASAN_FILES</code> di dalam script.</li>
+          <li>Klik polygon untuk melihat detail nama kawasan dan ID KI.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="text-center text-muted py-3">© 2025 KTT Dashboard — Kawasan Industri</div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <script>
+    // ================== KONFIGURASI ==================
+    const BASE_PATH = "ki_geojson/";
+    const KAWASAN_FILES = [
+  "1_bintan-inti-industrial-estate.geojson",
+  "2_batamindo-industrial-park.geojson",
+  "3_panbil-industrial-estate.geojson",
+  "4_bintang-industrial-park.geojson",
+  "5_tunas-industrial-estate.geojson",
+  "6_union-industrial-park.geojson",
+  "7_kawasan-indusri-terpadu-kabil-kitk.geojson",
+  "9_executive-industrial-park.geojson",
+  "10_sarana-industrial-point.geojson",
+  "11_kawasan-industri-sekupang-makmur-abadi.geojson",
+  "12_hijrah-industrial-park.geojson",
+  "13_indah-industrial-park.geojson",
+  "14_kawasan-industri-sadai.geojson",
+  "15_jakarta-industrial-estate-pulogadung.geojson",
+  "16_kawasan-berikat-nusantara-cakung.geojson",
+  "18_bekasi-international-industrial-estate.geojson",
+  "22_mm2100-industrial-town-mmid.geojson",
+  "27_east-jakarta-industrial-park.geojson",
+  "28_kawasan-industri-gobel.geojson",
+  "29_kawasan-industri-marunda-center.geojson",
+  "30_ki-multikarya-hasilprima.geojson",
+  "31_greenland-international-industrial-center-giic.geojson",
+  "32_greenland-international-industrial-center-2-giic-2.geojson",
+  "33_kawasan-industri-lippo-cikarang.geojson",
+  "34_cibinong-center-industrial-estate.geojson",
+  "35_kawasan-industri-sentul.geojson",
+  "36_kawasan-industri-indotaisei-kota-bukit-indah.geojson",
+  "37_kawasan-industri-kujang-cikampek.geojson",
+  "38_kawasan-industri-mitrakarawang.geojson",
+  "39_karawang-international-industrial-city.geojson",
+  "43_mandalapratama-permai-industrial-estate.geojson",
+  "46_taman-niaga-karawang-prima-gt-tech-park.geojson",
+  "47_karawang-new-industrial-city.geojson",
+  "48_pertiwi-lestari-industrial-estate.geojson",
+  "50_kertajati-industrial-estate-majalengka.geojson",
+  "51_kota-bukit-indah-industrial-city.geojson",
+  "52_kawasan-industri-lion.geojson",
+  "55_suryacipta-subang-smartpolitan.geojson",
+  "56_pt-surya-siti-indotama.geojson",
+  "57_pt-aneka-bumi-cipta.geojson",
+  "58_pt-jasa-semesta-utama.geojson",
+  "61_kawasan-industri-cikembar.geojson",
+  "62_kawasan-industri-dwipapuri-abadi.geojson",
+  "63_kawasan-industri-terpadu-batang.geojson",
+  "64_batang-industrial-park.geojson",
+  "65_jawa-tengah-land-industrial-park-sayung.geojson",
+  "66_kawasan-industri-kendal.geojson",
+  "67_kawasan-industri-wijayakusuma.geojson",
+  "68_bsb-industrial-park.geojson",
+  "69_kawasan-industri-terboyo-semarang.geojson",
+  "70_kawasan-industri-piyungan-creative-economy-park.geojson",
+  "71_kawasan-industri-gresik.geojson",
+  "72_maspion-industrial-estate.geojson",
+  "73_java-integrated-industrial-and-port-estate.geojson",
+  "74_ngoro-industrial-park.geojson",
+  "75_kawasan-industri-intiland.geojson",
+  "76_pasuruan-industrial-estate-rembang.geojson",
+  "78_kawasan-industri-safe-n-lock.geojson",
+  "80_kawasan-industri-tuban.geojson",
+  "82_kawasan-industri-nikomas-gemilang.geojson",
+  "83_modern-cikande-industrial-estate.geojson",
+  "87_kawasan-industri-sbs.geojson",
+  "89_millenium-industrial-estate.geojson",
+  "90_kawasan-industri-pasar-kemis.geojson",
+  "91_kawasan-industri-pergudangan-cikupamas.geojson",
+  "94_krakatau-industrial-estate-cilegon.geojson",
+  "95_kawasan-industri-sei-mangke.geojson",
+  "97_medanstar-industrial-estate.geojson",
+  "98_kawasan-industri-medan.geojson",
+  "99_kawasan-industri-kbs.geojson",
+  "101_kawasan-industri-batulicin.geojson",
+  "106_imip.geojson",
+  "107_kawasan-industri-batuta-bcip.geojson",
+  "108_kawasan-industri-stardust.geojson",
+  "109_kaltim-industrial-estate.geojson",
+  "110_international-green-industrial-park.geojson",
+  "112_kawasan-industri-konawe.geojson",
+  "113_kawasan-industri-weda-bay.geojson",
+  "114_kawasan-industri-palu.geojson",
+  "116_padang-industrial-park.geojson",
+  "117_kawasan-industri-motui.geojson",
+  "119_kawasan-industri-tanjung-buton.geojson",
+  "120_kawasan-industri-dumai.geojson",
+  "122_kawasan-industri-tanjung-enim.geojson",
+  "123_kipi.geojson",
+  "125_puri-industrial-park-2000.geojson",
+  "126_kawasan-taman-industri-busan-kikm.geojson",
+  "127_kawasan-industri-dan-pergudangan-taman-tekno-bsd.geojson",
+  "129_ki-bolaang-mongondow-kimong.geojson",
+  "131_kawasan-pergudangan-dan-industri-kosambi-permai.geojson",
+  "133_sinar-primera-industrial-karawang-eco-city-spike.geojson",
+  "134_central-cikarang-industrial-park-ccip.geojson",
+  "135_kawasan-industri-pulau-obi.geojson",
+  "136_kawasan-industri-royal-kosambi-kikm.geojson",
+  "137_ki-terpadu-cikaopark.geojson",
+  "138_kawasan-industri-landak.geojson",
+  "139_hacaca-business-park.geojson",
+  "143_kek-galang-batang.geojson",
+  "144_sebuku-indonesia-industrial-park.geojson",
+  "148_kawasan-industri-buli.geojson",
+  "151_ikip.geojson",
+  "153_ki-jorong.geojson",
+  "160_neo-energy-morowali-industrial-estate-nemie.geojson",
+  "162_gerindo-eco-indusrial-park.geojson",
+  "163_ipip.geojson",
+  "164_i-sentra-lamongan.geojson",
+  "166_ki-cikembar-ii.geojson",
+  "169_ki-pulau-penebang.geojson",
+  "170_kawasan-industri-seafer-kis.geojson",
+  "171_kawasan-industri-ykk.geojson",
+  "172_kawasan-industri-tembesi.geojson",
+  "174_kawasan-industri-duma-sejati.geojson",
+  "175_kawasan-industri-alumina-toba.geojson",
+  "176_kawasan-industri-aceh-ladong.geojson"
+];
+
+    let map;
+    let allGroup = L.featureGroup();
+    const kiGroups = new Map(); // nama_ki -> LayerGroup
+    let kiNameList = [];
+
+    function initMap() {
+      map = L.map("mapKI").setView([-2.5, 118], 5);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/">OSM</a> contributors'
+      }).addTo(map);
+
+      allGroup.addTo(map);
+      loadAllKawasan();
+    }
+
+    async function loadAllKawasan() {
+      const statusEl = document.getElementById("statusText");
+
+      if (!KAWASAN_FILES.length) {
+        statusEl.textContent = "Tidak ada file GeoJSON terdaftar di KAWASAN_FILES.";
+        statusEl.classList.add("bg-warning","text-dark");
+        return;
+      }
+
+      let loadedCount = 0;
+
+      for (const file of KAWASAN_FILES) {
+        try {
+          const resp = await fetch(BASE_PATH + file);
+          if (!resp.ok) {
+            console.warn("Gagal fetch:", file, resp.status);
+            continue;
+          }
+          const geo = await resp.json();
+          const featureCount = Array.isArray(geo.features) ? geo.features.length : 0;
+          console.log("File", file, "punya fitur:", featureCount);
+
+          const gj = L.geoJSON(geo, {
+            style: feature => {
+              const warna = feature.properties && feature.properties.warna;
+              return {
+                color: warna || "#1f77b4",
+                weight: 1,
+                fillOpacity: 0.4
+              };
+            },
+            onEachFeature: (feature, layer) => {
+              const props = feature.properties || {};
+              const nama = props.nama_ki || "Tanpa nama";
+              const idKi = (props.id_ki !== undefined && props.id_ki !== null) ? props.id_ki : (props.id ?? "-");
+
+              layer.bindPopup(
+                "<strong>" + nama + "</strong><br>ID KI: " + idKi
+              );
+
+              if (!kiGroups.has(nama)) {
+                kiGroups.set(nama, L.featureGroup());
+              }
+              kiGroups.get(nama).addLayer(layer);
+            }
+          });
+
+          allGroup.addLayer(gj);
+          loadedCount++;
+        } catch (err) {
+          console.error("Error load GeoJSON:", file, err);
+        }
+      }
+
+      if (!loadedCount) {
+        statusEl.textContent = "Tidak ada file GeoJSON yang berhasil dimuat.";
+        statusEl.classList.add("bg-danger","text-white");
+        return;
+      }
+
+      statusEl.textContent = "Memuat " + loadedCount + " file GeoJSON dari folder ki_geojson.";
+      statusEl.classList.remove("bg-danger","text-white","bg-warning","text-dark");
+      statusEl.classList.add("bg-success","text-white");
+
+      // Isi dropdown KI
+      const select = document.getElementById("filterKi");
+      const names = Array.from(kiGroups.keys()).sort();
+      kiNameList = names.slice();
+      for (const nama of names) {
+        const opt = document.createElement("option");
+        opt.value = nama;
+        opt.textContent = nama;
+        select.appendChild(opt);
+      }
+
+      // Fit ke semua jika ada layer
+      const totalLayers = allGroup.getLayers().length;
+      console.log("Total layer di allGroup:", totalLayers);
+      if (totalLayers) {
+        map.fitBounds(allGroup.getBounds(), { padding: [20,20] });
+      }
+    }
+
+    function applyFilterKi() {
+      const val = document.getElementById("filterKi").value;
+
+      // Semua polygon tetap ditampilkan di map.
+      // Dropdown hanya mengatur zoom ke kawasan tertentu atau ke seluruh KI.
+      if (val === "ALL") {
+        if (allGroup.getLayers().length) {
+          map.fitBounds(allGroup.getBounds(), { padding:[20,20] });
+        }
+      } else {
+        const group = kiGroups.get(val);
+        if (group && group.getLayers().length) {
+          map.fitBounds(group.getBounds(), { padding:[20,20] });
+        }
+      }
+    }
+
+    function handleSearchKi(e) {
+      const q = e.target.value.trim().toLowerCase();
+      if (!q) return;
+      if (!kiNameList.length) return;
+
+      const match = kiNameList.find(n => n.toLowerCase().includes(q));
+      if (!match) return;
+
+      const select = document.getElementById("filterKi");
+      if (select.value !== match) {
+        select.value = match;
+        applyFilterKi();
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      initMap();
+
+      document.getElementById("filterKi").addEventListener("change", applyFilterKi);
+      const searchInput = document.getElementById("searchKi");
+      if (searchInput) {
+        searchInput.addEventListener("input", handleSearchKi);
+      }
+      document.getElementById("btnZoomAll").addEventListener("click", () => {
+        if (allGroup.getLayers().length) {
+          map.fitBounds(allGroup.getBounds(), { padding:[20,20] });
+        }
+        document.getElementById("filterKi").value = "ALL";
+      });
+    });
+  </script>
+
+</body>
+</html>
